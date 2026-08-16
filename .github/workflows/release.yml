@@ -1,0 +1,94 @@
+name: Publish Poliora release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install release tools
+        run: python -m pip install . pytest ruff build
+      - name: Verify package
+        run: |
+          python -m ruff check poliora tests examples scripts
+          python -m pytest -q
+          python -m build
+          python scripts/release_check.py
+          python scripts/smoke_install.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+
+  windows-desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build standalone Windows app
+        run: |
+          python -m pip install . pyinstaller
+          pyinstaller --noconfirm --clean Poliora-Engine-Win.spec
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Compress-Archive -Path dist/Poliora-Engine-Win.exe -DestinationPath artifacts/Poliora-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop
+          path: artifacts/Poliora-Windows.zip
+
+  macos-desktop:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build standalone macOS app
+        run: |
+          python -m pip install . pyinstaller
+          pyinstaller --noconfirm --clean --windowed --name Poliora poliora/app_launcher.py
+          mkdir -p artifacts
+          ditto -c -k --sequesterRsrc --keepParent dist/Poliora.app artifacts/Poliora-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-desktop
+          path: artifacts/Poliora-macOS.zip
+
+  release:
+    needs: [verify, windows-desktop, macos-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release-assets/*
+
+  publish-pypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

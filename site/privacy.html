@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="assets/logo.png">
+  <meta name="description" content="Poliora's local-first privacy boundary for AI cost control.">
+  <link rel="canonical" href="https://poliora.com/privacy.html">
+  <meta name="robots" content="index,follow">
+  <title>Privacy boundary | Poliora</title>
+  <style>
+    body { margin: 0; background: #f6f3ed; color: #16201d; font-family: Inter, system-ui, sans-serif; }
+    main { width: min(780px, calc(100% - 40px)); margin: 0 auto; padding: 62px 0 88px; }
+    a { color: #237a58; }
+    h1 { margin: 26px 0 12px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(42px, 6vw, 64px); font-weight: 500; line-height: 1; }
+    h2 { margin-top: 40px; font-size: 20px; }
+    p, li { color: #536159; font-size: 15px; line-height: 1.7; }
+    .mark { display: grid; width: 34px; height: 34px; place-items: center; background: #18372d; color: #a9e8c8; font-size: 11px; font-weight: 900; text-decoration: none; }
+    .notice { margin: 30px 0; padding: 20px 22px; border-left: 4px solid #ef8063; background: #fffdf9; }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="mark" href="index.html" aria-label="Back to Poliora">P</a>
+    <h1>Privacy boundary</h1>
+    <p>Poliora 0.1.1 is a local application. This page describes the launch product, not a future hosted service.</p>
+    <div class="notice"><strong>The default path is local.</strong><p>The dashboard binds to <code>127.0.0.1</code>, and workspace data is stored in the current project's <code>.poliora</code> directory.</p></div>
+    <h2>Collected locally</h2>
+    <p>Poliora may store provider, model, token totals, supplied or estimated cost, workflow, customer label, timestamps, request status, and trace identifiers when the user chooses an integration.</p>
+    <h2>Not required</h2>
+    <p>Prompts, model replies, source code, and private transcripts are not required for cost accounting and are not collected by default.</p>
+    <h2>Provider credentials</h2>
+    <p>Keys used by provider SDKs or model discovery remain in the user's environment. They should never be placed in source code, a report, or a Poliora workspace file.</p>
+    <h2>Public website</h2>
+    <p>The launch website is static and does not receive local dashboard data. If Cloudflare Web Analytics is enabled, it measures anonymous website visits and performance; it does not receive Poliora workspace data, prompts, source code, or provider credentials.</p>
+    <p><a href="index.html">Return to Poliora</a></p>
+  </main>
+</body>
+</html>

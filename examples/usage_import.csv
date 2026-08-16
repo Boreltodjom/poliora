@@ -1,0 +1,4 @@
+Provider,Model,Prompt Tokens,Completion Tokens,Workflow,Customer,Created At
+openai,gpt-4o,8000,2000,proposal-agent,acme,2026-07-01T09:15:00+00:00
+openai,gpt-4o,7200,1800,proposal-agent,acme,2026-07-02T10:30:00+00:00
+openai,gpt-4o-mini,1400,350,support-reply,acme,2026-07-02T11:00:00+00:00

@@ -1,0 +1,67 @@
+[project]
+name = "poliora"
+version = "0.2.0"
+description = "AI cost, carbon, and fine-tuning efficiency toolkit."
+authors = [{ name = "Poliora Contributors" }]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11,<4.0"
+keywords = ["llm", "ai-finops", "cost-tracking", "sustainability", "carbon-tracking", "lora", "quantization"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "httpx>=0.25",
+    "rich>=13.0",
+    "typer>=0.9,<1.0",
+]
+
+[project.scripts]
+poliora = "poliora.main:app"
+
+[project.optional-dependencies]
+training = [
+    "accelerate>=0.25",
+    "bitsandbytes>=0.41",
+    "codecarbon>=2.3",
+    "datasets>=2.16",
+    "peft>=0.7",
+    "psutil>=5.9",
+    "pydantic>=2.5",
+    "pydantic-settings>=2.1",
+    "sentencepiece>=0.1.99",
+    "torch>=2.1",
+    "transformers>=4.36",
+]
+
+[tool.poetry]
+packages = [{ include = "poliora" }]
+exclude = ["site", "artifacts", "tmp-smoke", "tmp-clean-install-*", ".agents"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4"
+ruff = ">=0.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

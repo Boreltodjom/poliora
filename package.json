@@ -1,0 +1,13 @@
+{
+  "name": "poliora-release-checks",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser smoke checks for the Poliora static site and local dashboard.",
+  "scripts": {
+    "test:site": "node scripts/site_smoke.cjs",
+    "test:dashboard": "node scripts/ui_smoke.cjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}

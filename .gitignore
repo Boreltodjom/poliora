@@ -1,0 +1,59 @@
+# === Python ===
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# === Virtual environments ===
+.venv/
+venv/
+env/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === ML Artifacts ===
+*.pt
+*.bin
+*.safetensors
+*.gguf
+tuned_model/
+outputs/
+checkpoints/
+
+# === Carbon tracking ===
+emissions/
+emissions.csv
+
+# === Poliora local workspace ===
+.poliora/
+.ecotune/
+.agents/
+artifacts/
+tmp-smoke/
+tmp-clean-install-*/
+
+# === Misc ===
+.env
+.DS_Store
+Thumbs.db
+wandb/
+mlruns/
+*.log
+node_modules/
+site/downloads/*.exe
+site/downloads/EcoTune-*
+EcoTune-Engine-Win.spec
+
+# === Unrelated package/runtime secrets ===
+config/secret_key
+config/field_encryption_key
+config/codex.toml

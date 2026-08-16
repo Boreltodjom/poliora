@@ -1,0 +1,24 @@
+# Poliora
+
+> Poliora is a local-first AI cost control application for developers and technical teams.
+
+## What it does
+
+- Records AI usage metadata only when a person explicitly imports or connects a supported source.
+- Compares approved model rates and helps teams test lower-cost routing decisions.
+- Separates modeled savings from measured, realized savings.
+- Runs its dashboard locally on the user's computer.
+
+## Privacy boundary
+
+Poliora does not collect prompts, model replies, source code, private transcripts, credentials, or provider account history by default. A launcher scan checks only whether supported local tools are available.
+
+## Supported workflow
+
+Poliora can detect local Codex, Claude Code, Cursor, and Antigravity launchers. It supports authorized CSV imports and supported API usage wrappers. Subscription activity is not converted into invented per-token cost.
+
+## Key pages
+
+- Product: https://poliora.com/
+- Privacy: https://poliora.com/privacy.html
+- Sitemap: https://poliora.com/sitemap.xml
