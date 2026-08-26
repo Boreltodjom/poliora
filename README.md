@@ -1,6 +1,6 @@
 # Poliora
 
-Poliora is an AI cost, carbon, and fine-tuning efficiency toolkit.
+Poliora is a local-first AI usage and cost control application. It shows what Codex and Claude Code already recorded on your computer, then helps you decide whether your AI plans, models, and routes are worth what you pay.
 
 [Laptop testing](docs/LAPTOP_TESTING.md) | [Release gate](docs/LAUNCH_CHECKLIST.md) | [Hosting](docs/HOSTING_AND_LAUNCH.md) | [Private pilot](docs/PILOT_GUIDE.md) | [Privacy](docs/PRIVACY.md) | [Security](SECURITY.md) | [Changelog](CHANGELOG.md) | [License](LICENSE)
 
@@ -22,19 +22,29 @@ recommendations for reducing waste.
   and measured rollout, keeping projected and realized savings separate.
 - Keeps the existing LoRA, quantization, carbon tracking, and training benchmark tools.
 
-## Install And Open
+## See Your Existing AI Usage First
 
-The launch install is deliberately small. Install the cost-control product, move
-to the folder where its local data should live, and run one command:
+Poliora's fastest first result is local history detection. It reads only the metadata Codex and Claude Code already keep in their own local session logs: timestamps, model names, token totals, plan type, and quota where available. It does not read prompts, replies, source code, commands, credentials, or chat transcripts.
 
 ```bash
 pip install poliora
+poliora detect
+```
+
+The result shows requests, token totals, model mix, plan information, and the equivalent API value of subscription activity. It does **not** pretend that a flat subscription is API spend.
+
+When you have reviewed the result, add only that metadata to Poliora's local dashboard:
+
+```bash
+poliora detect --import
 poliora dashboard
 ```
 
-On first run, Poliora creates a `.poliora` workspace and opens
-`http://127.0.0.1:8787` automatically. The same command opens the existing
-workspace on future runs. Stop the local app with `Ctrl+C`.
+The dashboard opens at `http://127.0.0.1:8787`. It creates a `.poliora` workspace beside the folder where you run the command. The desktop installer uses a private per-user workspace instead.
+
+## Install And Open
+
+For a regular desktop installation, use the Windows or macOS download from the Poliora website. The Windows installer includes its own runtime and creates a Start menu and desktop shortcut; Python is not required.
 
 The legacy fine-tuning toolkit is optional because its machine-learning
 dependencies are much larger:
@@ -108,6 +118,8 @@ Start a browser-based control room for the current workspace:
 ```bash
 poliora dashboard
 ```
+
+The **Start here** screen also offers **Show me the usage history already on this computer**. It previews supported local Codex and Claude Code history before you choose to add any metadata to the dashboard, and repeated imports never duplicate a detected turn.
 
 Then open `http://127.0.0.1:8787`. The dashboard reads local data only, includes the routing simulator, and can export a client-ready HTML report. It binds to your computer by default; do not expose it to the public internet yet.
 

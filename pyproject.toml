@@ -1,6 +1,6 @@
 [project]
 name = "poliora"
-version = "0.2.0"
+version = "0.2.1"
 description = "AI cost, carbon, and fine-tuning efficiency toolkit."
 authors = [{ name = "Poliora Contributors" }]
 readme = "README.md"

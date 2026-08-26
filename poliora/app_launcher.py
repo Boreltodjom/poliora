@@ -24,6 +24,16 @@ def _available_port(preferred_port: int) -> int:
     raise RuntimeError("No local dashboard port was available in the configured range.")
 
 
+def _running_dashboard_port(preferred_port: int) -> int | None:
+    """Return an existing Poliora dashboard port so a second launch reopens it."""
+    for port in range(preferred_port, preferred_port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.settimeout(0.2)
+            if probe.connect_ex(("127.0.0.1", port)) == 0:
+                return port
+    return None
+
+
 def _desktop_workspace_root() -> Path:
     """Choose the normal per-user application-data location for the desktop app."""
     if sys.platform == "win32":
@@ -56,6 +66,12 @@ def main() -> None:
     print("=" * 60)
     print(" [Poliora] Starting Desktop AI Cost Optimizer...")
     print("=" * 60)
+
+    existing_port = _running_dashboard_port(arguments.port)
+    if existing_port is not None:
+        if not arguments.no_open:
+            webbrowser.open_new_tab(f"http://127.0.0.1:{existing_port}")
+        return
 
     workspace_root = _desktop_workspace_root()
     workspace = load_workspace(workspace_root)

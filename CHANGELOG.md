@@ -2,6 +2,17 @@
 
 All notable Poliora changes are documented here.
 
+## 0.2.1 - First-Run Desktop Experience
+
+### Added
+
+- A consent-based local-history flow in the dashboard: review Codex and Claude Code token, model, plan, and quota metadata before adding it to the local workspace.
+- A no-Python Windows installer that creates Start menu and desktop access for Poliora.
+
+### Changed
+
+- The public onboarding and PyPI documentation now lead with `poliora detect`, not the availability-only `poliora scan` command.
+- Repeated local-history imports skip usage already recorded in the workspace.
 ## 0.2.0 - Local Usage Detection
 
 ### Added

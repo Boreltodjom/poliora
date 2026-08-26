@@ -11,7 +11,7 @@
 
 ## Privacy boundary
 
-Poliora does not collect prompts, model replies, source code, private transcripts, credentials, or provider account history by default. A launcher scan checks only whether supported local tools are available.
+Poliora does not collect prompts, model replies, source code, private transcripts, credentials, or provider account history by default. Poliora can review supported Codex and Claude Code usage metadata only after the person requests it. It does not read prompts, replies, source code, private transcripts, credentials, or provider account history.
 
 ## Supported workflow
 
@@ -19,6 +19,6 @@ Poliora can detect local Codex, Claude Code, Cursor, and Antigravity launchers. 
 
 ## Key pages
 
-- Product: https://poliora.com/
-- Privacy: https://poliora.com/privacy.html
-- Sitemap: https://poliora.com/sitemap.xml
+- Product: https://poliora.pages.dev/
+- Privacy: https://poliora.pages.dev/privacy.html
+- Sitemap: https://poliora.pages.dev/sitemap.xml

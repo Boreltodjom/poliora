@@ -23,7 +23,7 @@ async function inspect(browser, name, viewport) {
   page.on("pageerror", (error) => errors.push(error.message));
   const response = await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
   if (!response || !response.ok()) throw new Error(`${name}: site returned ${response?.status()}`);
-  if ((await page.locator('link[rel="canonical"]').getAttribute("href")) !== "https://poliora.com/") {
+  if ((await page.locator('link[rel="canonical"]').getAttribute("href")) !== "https://poliora.pages.dev/") {
     throw new Error(`${name}: canonical URL is missing or incorrect`);
   }
   const description = await page.locator('meta[name="description"]').getAttribute("content");
@@ -31,15 +31,20 @@ async function inspect(browser, name, viewport) {
   const structuredData = await page.locator('script[type="application/ld+json"]').textContent();
   if (!structuredData || !JSON.parse(structuredData)["@graph"]) throw new Error(`${name}: structured data is invalid`);
   if (!(await page.locator(".brand-text").isVisible())) throw new Error(`${name}: product brand missing`);
+  if (!(await page.locator("#detection").isVisible())) throw new Error(`${name}: local history section missing`);
   if (!(await page.locator("#calculator").isVisible())) throw new Error(`${name}: calculator missing`);
   if (!(await page.locator("#strategy").isVisible())) throw new Error(`${name}: decision path missing`);
   if (!(await page.locator("#download").isVisible())) throw new Error(`${name}: install section missing`);
-  for (const href of [
-    "downloads/Poliora-Setup-Windows.cmd",
-    "downloads/Poliora-Setup-Mac.command",
-  ]) {
-    const installer = await page.request.get(`${url}/${href}`);
-    if (!installer.ok()) throw new Error(`${name}: installer is unavailable: ${href}`);
+  const windowsDownload = await page.locator('#download a').first().getAttribute('href');
+  const macDownload = await page.locator('#download a').nth(1).getAttribute('href');
+  if (windowsDownload !== "https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-Setup-Windows.exe") {
+    throw new Error(`${name}: Windows desktop installer link is incorrect`);
+  }
+  if (macDownload !== "https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS.zip") {
+    throw new Error(`${name}: macOS desktop download link is incorrect`);
+  }
+  if ((await page.locator('.cli-cmd').textContent()).trim() !== 'poliora detect') {
+    throw new Error(`${name}: first-run detection command is missing`);
   }
 
   await page.locator("#spendSlider").fill("500");

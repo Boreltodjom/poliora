@@ -140,6 +140,15 @@ def test_mutating_requests_from_a_foreign_origin_are_rejected(dashboard: int, or
     assert status == 403
 
 
+def test_forged_history_detection_is_rejected(dashboard: int) -> None:
+    status, _ = request(
+        dashboard, "POST", "/api/detect-history", body="{}", headers={"Origin": "http://evil.example.com"}
+    )
+    assert status == 403
+
+
+
+
 def test_forged_import_cannot_inject_usage(dashboard: int) -> None:
     # The highest-value forgery target: silently seeding someone's cost history.
     payload = json.dumps({"csv_text": "provider,model,input_tokens,output_tokens\nopenai,gpt-5.6-sol,1,1\n"})

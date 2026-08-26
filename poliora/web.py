@@ -33,6 +33,7 @@ from poliora.cost import (
     load_workspace,
     preview_usage_csv_text,
     render_html_report,
+    scan_local_usage,
     simulate_model_switch,
     summarize_decisions,
 )
@@ -143,6 +144,7 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
             "/api/import/preview",
             "/api/import",
             "/api/detect-tools",
+            "/api/detect-history",
         } and connector_action is None:
             self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
@@ -160,6 +162,8 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
                 result = self._import_csv(payload)
             elif path == "/api/detect-tools":
                 result = self._detect_tools()
+            elif path == "/api/detect-history":
+                result = self._detect_history(payload)
             elif path == "/api/decisions":
                 result = self._save_decision(payload)
             elif connector_action is not None:
@@ -176,6 +180,37 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
         return {
             "tools": [item.to_dict() for item in detect_local_tools(self.root)],
             "notice": "This scan checks supported launcher availability and the Poliora workspace helper only. It does not open AI tools or read chats, code, prompts, credentials, or account history.",
+        }
+
+    def _detect_history(self, payload: dict[str, Any]) -> dict[str, object]:
+        """Read supported local usage logs only after the person asks us to."""
+        workspace = load_workspace(self.root)
+        registry = PricingRegistry.load(workspace.pricing_path)
+        scans = scan_local_usage(registry=registry)
+        detected = [scan for scan in scans if scan.available]
+        events = [event for scan in detected for event in scan.events]
+        imported = 0
+
+        if bool(payload.get("import")):
+            store = JsonlUsageStore(workspace.usage_path)
+            existing = {_usage_identity(event) for event in store.read_all()}
+            for event in events:
+                identity = _usage_identity(event)
+                if identity not in existing:
+                    store.append(event)
+                    existing.add(identity)
+                    imported += 1
+
+        equivalent_value = sum(scan.equivalent_api_cost_usd for scan in detected)
+        return {
+            "scans": [scan.to_dict() for scan in scans],
+            "requests": len(events),
+            "equivalent_api_cost_usd": round(equivalent_value, 4),
+            "imported_events": imported,
+            "notice": (
+                "Poliora read only timestamps, model names, token totals, plan and quota metadata "
+                "from supported local logs. It did not read prompts, replies, code, credentials, or chats."
+            ),
         }
 
     def do_PATCH(self) -> None:  # noqa: N802
@@ -836,7 +871,7 @@ def _dashboard_page() -> str:
     <main>
       <section class="view active" data-view="welcome">
         <div class="welcome-hero"><p class="view-kicker">A simple first step</p><h1>Let’s make your AI use easier to understand.</h1><p class="summary">You do not need to know models, tokens, or code to begin. Pick the sentence that sounds most like you. Poliora will show the next useful step and explain what it can, and cannot, see.</p></div>
-        <div class="welcome-choices"><button class="welcome-choice" type="button" data-welcome-action="scan"><span>I use AI tools here</span><strong>I use Codex, Claude Code, Cursor, or another desktop tool.</strong><p>We can safely look for the tools on this computer. You decide whether anything is connected.</p></button><button class="welcome-choice" type="button" data-welcome-action="import"><span>I have a bill or export</span><strong>I want to understand spending I already have.</strong><p>Bring an approved CSV export. Poliora checks it before saving anything locally.</p></button><button class="welcome-choice" type="button" data-welcome-action="demo"><span>I am just exploring</span><strong>Show me an example before I connect anything.</strong><p>Load fictional sample data, then explore the dashboard without touching your real information.</p></button></div>
+        <div class="welcome-choices"><button class="welcome-choice" type="button" data-welcome-action="history"><span>I use Codex or Claude Code</span><strong>Show me the usage history already on this computer.</strong><p>First review the token, model, plan, and quota metadata Poliora can see. Nothing is saved until you approve it.</p></button><button class="welcome-choice" type="button" data-welcome-action="import"><span>I have a bill or export</span><strong>I want to understand spending I already have.</strong><p>Bring an approved CSV export. Poliora checks it before saving anything locally.</p></button><button class="welcome-choice" type="button" data-welcome-action="demo"><span>I am just exploring</span><strong>Show me an example before I connect anything.</strong><p>Load fictional sample data, then explore the dashboard without touching your real information.</p></button></div>
         <div class="welcome-boundary"><strong>Your choice comes first.</strong> Poliora does not read your prompts, source code, chats, passwords, or provider account history. It only handles the usage information you choose to connect or import.</div>
       </section>
       <section class="view" data-view="overview">
@@ -854,7 +889,8 @@ def _dashboard_page() -> str:
 
       <section class="view" data-view="connections">
         <header class="view-heading"><div><p class="view-kicker">Your choices</p><h1>Add a tool or a bill</h1><p class="summary">Choose what Poliora may observe, or import a bill you are allowed to use. Every option explains what it can provide before setup.</p></div></header>
-        <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Start with the tools already on this computer</h2><p>Poliora checks only whether supported launchers are available and whether its Antigravity workspace helper exists. It will not open a tool or read chats, prompts, code, credentials, or account history.</p></div><button id="scan-tools" type="button">Scan this computer</button></div><div id="tool-scan-results" class="tool-scan-results" hidden></div></section>
+        <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Find the AI usage already recorded here</h2><p>For Codex and Claude Code, Poliora can review local usage metadata already written by those tools: timestamps, token totals, model, plan, and quota. It never reads prompts, replies, code, credentials, or chats. Review the result before adding anything to your dashboard.</p></div><button id="detect-history" type="button">Review local history</button></div><div id="history-results" class="tool-scan-results" hidden></div></section>
+        <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Check which other tools are ready</h2><p>This availability check only looks for supported launchers and the Poliora Antigravity workspace helper. It never opens a tool or reads account history.</p></div><button id="scan-tools" type="button">Check installed tools</button></div><div id="tool-scan-results" class="tool-scan-results" hidden></div></section>
         <section class="panel import-panel"><h2>Import existing usage</h2><p class="panel-note">Select a CSV to validate it locally before anything is written. Required information is model, input tokens, output tokens, and provider in the file or below.</p><div class="import-controls"><label>Usage CSV<input id="import-file" type="file" accept=".csv,text/csv"></label><label>Default provider<input id="import-provider" placeholder="openai"></label><label>Default project<input id="import-project" placeholder="Workspace project"></label></div><label class="check-line"><input id="import-skip-invalid" type="checkbox"> Import valid rows when some rows are rejected</label><div class="button-row"><button id="import-preview-button" type="button">Preview file</button><button class="secondary" id="import-commit" type="button" disabled>Import rows</button></div><div class="import-preview" id="import-preview" hidden></div></section>
         <section class="panel connection-center"><h2>Available data sources</h2><p class="panel-note">Poliora collects usage metadata and costs by default, never prompts, source code, or model replies. Approval here records consent; credentials are configured separately.</p><div id="connectors" class="connector-grid"></div></section>
       </section>
@@ -1030,6 +1066,32 @@ def _dashboard_page() -> str:
       results.hidden = false;
       results.innerHTML = `<p class="panel-note" style="grid-column:1/-1;margin:0">${escapeHtml(notice)}</p>` + tools.map(tool => `<article class="tool-scan-result ${tool.detected ? 'detected' : ''}"><strong>${escapeHtml(tool.name)}</strong><span class="scan-state">${tool.detected ? 'Available to review' : 'Not found'}</span><p>${escapeHtml(tool.detail)}</p><p><strong>Next:</strong> ${escapeHtml(tool.next_step)}</p><p>${escapeHtml(tool.history_note)}</p></article>`).join('');
     }
+    function renderHistoryDetection(data) {
+      const results = byId('history-results');
+      const scans = data.scans || [];
+      const available = scans.filter(scan => scan.available);
+      const cards = available.map(scan => {
+        const plan = scan.plan && scan.plan.plan_type ? scan.plan.plan_type : 'plan not recorded';
+        const quota = scan.plan && scan.plan.quota_used_pct !== null && scan.plan.quota_used_pct !== undefined ? `<p><strong>Quota:</strong> ${scan.plan.quota_used_pct.toFixed(1)}% used</p>` : '';
+        return `<article class="tool-scan-result detected"><strong>${escapeHtml(scan.display_name)}</strong><span class="scan-state">${scan.requests.toLocaleString()} requests found</span><p><strong>Plan:</strong> ${escapeHtml(plan)}<br><strong>Tokens:</strong> ${scan.total_tokens.toLocaleString()}<br><strong>Equivalent API value:</strong> ${money(scan.equivalent_api_cost_usd)}</p>${quota}</article>`;
+      }).join('');
+      const action = data.requests && !data.imported_events ? `<p class="panel-note" style="grid-column:1/-1;margin:0"><button id="import-detected-history" type="button">Add ${data.requests.toLocaleString()} metadata-only records to my dashboard</button></p>` : '';
+      const imported = data.imported_events ? `<p class="panel-note" style="grid-column:1/-1;margin:0"><strong>${data.imported_events.toLocaleString()} new records added.</strong> Your overview now reflects the local history you approved.</p>` : '';
+      results.hidden = false;
+      results.innerHTML = `<p class="panel-note" style="grid-column:1/-1;margin:0">${escapeHtml(data.notice || '')}</p>` + (cards || '<p class="panel-note" style="grid-column:1/-1;margin:0">No supported Codex or Claude Code history was found yet. You can still import an authorized CSV or use the guided sample data.</p>') + action + imported;
+    }
+    async function detectHistory(importHistory = false) {
+      const button = byId('detect-history'); const results = byId('history-results');
+      button.disabled = true; button.textContent = importHistory ? 'Adding...' : 'Reading local history...'; results.hidden = true;
+      try {
+        const response = await fetch('/api/detect-history', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({import: importHistory})});
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Could not read local history.');
+        renderHistoryDetection(data);
+        if (importHistory) await loadOverview(activeDays);
+      } catch (error) {
+        results.hidden = false; results.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+      } finally { button.disabled = false; button.textContent = 'Review local history'; }
+    }
     function renderScenarios(scenarios) {
       if (!scenarios.length) { byId('scenarios').innerHTML = '<p class="empty">No saved routing scenarios yet.</p>'; return; }
       byId('scenarios').innerHTML = scenarios.map(item => {
@@ -1159,6 +1221,10 @@ def _dashboard_page() -> str:
         results.hidden = false; results.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
       } finally { button.disabled = false; button.textContent = 'Scan this computer'; }
     });
+    byId('detect-history').addEventListener('click', () => detectHistory());
+    byId('history-results').addEventListener('click', event => {
+      if (event.target.closest('#import-detected-history')) detectHistory(true);
+    });
     byId('load-demo').addEventListener('click', async () => {
       const button = byId('load-demo'); const message = byId('demo-message');
       button.disabled = true; message.textContent = 'Loading fictional sample data...';
@@ -1286,7 +1352,7 @@ def _dashboard_page() -> str:
     }));
     document.querySelectorAll('[data-welcome-action]').forEach(button => button.addEventListener('click', () => {
       const action = button.dataset.welcomeAction;
-      if (action === 'scan') { activateView('connections'); setTimeout(() => byId('scan-tools').click(), 0); return; }
+      if (action === 'history') { activateView('connections'); setTimeout(() => byId('detect-history').click(), 0); return; }
       if (action === 'import') { activateView('connections'); setTimeout(() => byId('import-file').focus(), 0); return; }
       activateView('overview');
       if (byId('demo-action').hidden) {
@@ -1300,6 +1366,22 @@ def _dashboard_page() -> str:
   </script>
 </body>
 </html>"""
+
+
+def _usage_identity(event: UsageEvent) -> tuple[object, ...]:
+    """Identify a locally detected turn so repeated review never duplicates it."""
+    return (
+        event.provider,
+        event.model,
+        event.input_tokens,
+        event.output_tokens,
+        event.cached_input_tokens,
+        event.reasoning_tokens,
+        event.operation,
+        event.trace_id,
+        event.timestamp,
+        event.metadata.get("source"),
+    )
 
 
 def _catalog_rows(

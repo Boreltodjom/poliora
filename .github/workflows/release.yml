@@ -37,16 +37,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build standalone Windows app
+      - name: Build desktop installer with its own runtime
         run: |
           python -m pip install . pyinstaller
           pyinstaller --noconfirm --clean Poliora-Engine-Win.spec
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          Compress-Archive -Path dist/Poliora-Engine-Win.exe -DestinationPath artifacts/Poliora-Windows.zip
+          choco install innosetup --no-progress -y
+          $version = python -c "from poliora import __version__; print(__version__)"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "installer\Poliora.iss"
       - uses: actions/upload-artifact@v4
         with:
           name: windows-desktop
-          path: artifacts/Poliora-Windows.zip
+          path: artifacts/Poliora-Setup-Windows.exe
 
   macos-desktop:
     runs-on: macos-15-intel

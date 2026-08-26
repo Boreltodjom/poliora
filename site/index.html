@@ -6,13 +6,13 @@
   <link rel="icon" href="assets/logo.png">
   <meta name="description" content="Poliora is a local-first AI cost control app for developers. Track approved AI usage, compare model costs, and test lower-cost routes without collecting prompts or source code.">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
-  <link rel="canonical" href="https://poliora.com/">
+  <link rel="canonical" href="https://poliora.pages.dev/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Poliora">
   <meta property="og:title" content="Poliora | Local AI Cost Control for Developers">
   <meta property="og:description" content="Track approved AI usage, compare model costs, and test lower-cost routes locally.">
-  <meta property="og:url" content="https://poliora.com/">
-  <meta property="og:image" content="https://poliora.com/assets/logo.png">
+  <meta property="og:url" content="https://poliora.pages.dev/">
+  <meta property="og:image" content="https://poliora.pages.dev/assets/logo.png">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Poliora | Local AI Cost Control for Developers">
   <meta name="twitter:description" content="Local-first AI cost control for developers and technical teams.">
@@ -25,18 +25,18 @@
       {
         "@type": "Organization",
         "name": "Poliora",
-        "url": "https://poliora.com/",
-        "logo": "https://poliora.com/assets/logo.png"
+        "url": "https://poliora.pages.dev/",
+        "logo": "https://poliora.pages.dev/assets/logo.png"
       },
       {
         "@type": "SoftwareApplication",
         "name": "Poliora",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Windows, macOS",
-        "softwareVersion": "0.1.2",
+        "softwareVersion": "0.2.1",
         "description": "A local-first AI cost control app that helps developers record approved usage, compare model costs, and test lower-cost routes.",
-        "url": "https://poliora.com/",
-        "image": "https://poliora.com/assets/logo.png",
+        "url": "https://poliora.pages.dev/",
+        "image": "https://poliora.pages.dev/assets/logo.png",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -140,21 +140,24 @@
       height: 76px;
     }
     .brand-logo {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
+      min-width: 0;
       text-decoration: none;
     }
     .brand-img {
-      height: 38px;
-      width: auto;
-      border-radius: 6px;
+      display: block;
+      width: 42px;
+      height: 42px;
+      object-fit: cover;
+      border-radius: 0;
     }
     .brand-text {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 800;
       color: var(--text-main);
-      letter-spacing: -0.03em;
+      letter-spacing: 0;
     }
     .brand-text span {
       color: var(--emerald);
@@ -356,6 +359,32 @@
       color: var(--text-main);
     }
 
+    /* Local usage discovery */
+    .detection-section {
+      padding: 76px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.015);
+    }
+    .detection-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .detection-copy p { color: var(--text-muted); margin-top: 14px; max-width: 470px; }
+    .detection-steps { list-style: none; display: grid; gap: 14px; margin-top: 26px; }
+    .detection-steps li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; color: var(--text-muted); font-size: 14px; }
+    .detection-steps b { color: var(--emerald); font-size: 12px; }
+    .detect-terminal { background: #06090f; border: 1px solid rgba(16, 185, 129, 0.35); padding: 26px; box-shadow: var(--shadow-md); overflow: hidden; }
+    .terminal-top { display: flex; gap: 7px; margin-bottom: 20px; }
+    .terminal-top i { width: 9px; height: 9px; border-radius: 50%; background: #ef8063; }
+    .terminal-top i:nth-child(2) { background: #f4bd5d; }
+    .terminal-top i:nth-child(3) { background: var(--emerald); }
+    .terminal-line { display: block; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; line-height: 1.8; color: #cbd5e1; }
+    .terminal-line strong { color: #ecfdf5; }
+    .terminal-line .green { color: #34d399; }
+    .terminal-caption { margin-top: 16px; color: var(--text-dim); font-size: 12px; }
     /* Interactive Savings Calculator */
     .calc-section {
       padding: 64px 0;
@@ -558,9 +587,10 @@
       .nav-inner { height: 64px; }
       .nav-menu { display: none; }
       .brand-logo { gap: 8px; }
-      .brand-img { height: 34px; }
+      .brand-img { width: 34px; height: 34px; }
       .brand-text { font-size: 17px; }
       .nav-actions .btn { padding: 8px 10px; font-size: 12px; }
+      .detection-grid { grid-template-columns: 1fr; gap: 28px; }
       .matrix-table { min-width: 620px; }
       .matrix-table th, .matrix-table td { padding: 14px 16px; }
     }
@@ -608,7 +638,7 @@
     <header class="navbar">
       <div class="container nav-inner">
         <a href="#" class="brand-logo">
-          <img src="assets/logo.png" alt="Poliora AI Logo" class="brand-img">
+          <img src="assets/logo.webp" alt="Poliora AI Logo" class="brand-img">
           <div class="brand-text">Poli<span>ora</span></div>
         </a>
         <ul class="nav-menu">
@@ -640,7 +670,7 @@
         <div class="cli-box">
           <div class="cli-code">
             <span class="cli-prompt">$</span>
-            <span class="cli-cmd">pip install poliora &amp;&amp; poliora scan</span>
+            <span class="cli-cmd">poliora detect</span>
           </div>
           <button class="copy-btn" type="button">Copy</button>
         </div>
@@ -656,7 +686,7 @@
             <div class="stat-lbl">Dashboard and workspace</div>
           </div>
           <div class="stat-card">
-            <div class="stat-val">45+</div>
+            <div class="stat-val">54+</div>
             <div class="stat-lbl">Models in the local catalog</div>
           </div>
           <div class="stat-card">
@@ -667,6 +697,31 @@
       </div>
     </section>
 
+    <!-- Local usage discovery -->
+    <section id="detection" class="detection-section">
+      <div class="container detection-grid">
+        <div class="detection-copy">
+          <div class="section-tag">Your first useful result</div>
+          <h2 class="section-title">Find the history your AI tools already recorded.</h2>
+          <p>Start with Codex or Claude Code usage already on your computer. Poliora shows the models, token totals, plan and quota metadata it can find, before you choose whether to add that metadata to your private dashboard.</p>
+          <ol class="detection-steps">
+            <li><b>01</b><span><strong>Review locally.</strong> No account login, provider key, or upload is needed.</span></li>
+            <li><b>02</b><span><strong>See the value.</strong> Understand equivalent API value without pretending a subscription is per-token spend.</span></li>
+            <li><b>03</b><span><strong>Approve the import.</strong> Only then does Poliora add metadata to your dashboard.</span></li>
+          </ol>
+        </div>
+        <div class="detect-terminal" aria-label="Illustrative Poliora detection output">
+          <div class="terminal-top"><i></i><i></i><i></i></div>
+          <code class="terminal-line"><span class="green">$</span> poliora detect</code>
+          <code class="terminal-line">Reading what your AI tools already recorded locally</code>
+          <code class="terminal-line">&nbsp;</code>
+          <code class="terminal-line"><strong>Codex CLI</strong> &nbsp; ChatGPT plan &nbsp; 876 requests &nbsp; 4.2M tokens</code>
+          <code class="terminal-line"><strong>Most used model</strong> &nbsp; gpt-5.6-sol</code>
+          <code class="terminal-line"><strong>Equivalent API value</strong> &nbsp; <span class="green">$153.00</span></code>
+          <p class="terminal-caption">Illustrative output. Your result comes only from the supported local history on your own computer.</p>
+        </div>
+      </div>
+    </section>
     <!-- Interactive Savings Calculator -->
     <section id="calculator" class="calc-section">
       <div class="container">
@@ -807,19 +862,19 @@
           <!-- Windows Card -->
           <div class="dl-card">
             <div class="dl-os">Windows</div>
-            <div class="dl-desc">A guided local installer. It sets up Poliora privately, scans supported tools, and opens the dashboard.</div>
-            <a href="downloads/Poliora-Setup-Windows.cmd" class="btn btn-emerald" style="width: 100%;" download>
-              Install for Windows
+            <div class="dl-desc">A normal desktop installer with its own runtime. No Python, terminal setup, or developer account required. Creates Poliora in the Start menu and on your desktop.</div>
+            <a href="https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-Setup-Windows.exe" class="btn btn-emerald" style="width: 100%;">
+              Download for Windows
             </a>
-            <p class="result-sub" style="margin-top: 14px;">The self-contained Windows app is delivered through the GitHub release.</p>
+            <p class="result-sub" style="margin-top: 14px;">Your history stays on this computer. The installer opens Poliora when setup finishes.</p>
           </div>
 
           <!-- macOS Card -->
           <div class="dl-card">
             <div class="dl-os">macOS</div>
-            <div class="dl-desc">Native setup script (.command) for Apple Silicon and Intel Macs.</div>
-            <a href="downloads/Poliora-Setup-Mac.command" class="btn btn-outline" style="width: 100%;" download>
-              Download for macOS (.command)
+            <div class="dl-desc">A standalone Mac app for Apple Silicon and Intel Macs. Download, unzip, move Poliora to Applications, then open it whenever you need it.</div>
+            <a href="https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS.zip" class="btn btn-outline" style="width: 100%;">
+              Download for macOS
             </a>
           </div>
         </div>
