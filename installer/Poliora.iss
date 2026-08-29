@@ -21,6 +21,7 @@ OutputBaseFilename=Poliora-Setup-Windows
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\assets\poliora.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 

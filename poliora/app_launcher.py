@@ -1,4 +1,4 @@
-"""Standalone Desktop App launcher for Poliora."""
+"""Standalone native desktop application launcher for Poliora."""
 
 from __future__ import annotations
 
@@ -6,12 +6,11 @@ import argparse
 import os
 import socket
 import sys
-import webbrowser
 from pathlib import Path
-from threading import Timer
+from threading import Thread
 
 from poliora.cost import init_workspace, load_workspace
-from poliora.web import run_dashboard
+from poliora.web import create_dashboard_server
 
 
 def _available_port(preferred_port: int) -> int:
@@ -25,7 +24,7 @@ def _available_port(preferred_port: int) -> int:
 
 
 def _running_dashboard_port(preferred_port: int) -> int | None:
-    """Return an existing Poliora dashboard port so a second launch reopens it."""
+    """Return an occupied local dashboard port, if Poliora is already open."""
     for port in range(preferred_port, preferred_port + 20):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
             probe.settimeout(0.2)
@@ -44,55 +43,67 @@ def _desktop_workspace_root() -> Path:
     return data_home / "poliora" / "workspace"
 
 
+def _run_native_window(url: str) -> None:
+    """Display the local dashboard inside Poliora's own desktop window."""
+    import webview
+
+    webview.create_window(
+        "Poliora",
+        url=url,
+        width=1480,
+        height=960,
+        min_size=(960, 680),
+        background_color="#f6f6f2",
+    )
+    webview.start()
+
+
 def main() -> None:
-    """Launch Poliora standalone GUI application."""
-    parser = argparse.ArgumentParser(description="Launch the Poliora local dashboard.")
+    """Launch Poliora as a local native desktop application."""
+    parser = argparse.ArgumentParser(description="Launch the Poliora local desktop application.")
     parser.add_argument("--version", action="store_true", help="Show the standalone app version and exit.")
     parser.add_argument("--port", type=int, default=8787, help="Preferred local dashboard port.")
-    parser.add_argument("--no-open", action="store_true", help="Do not open a browser window.")
+    parser.add_argument("--no-open", action="store_true", help="Run only the local engine for support and smoke tests.")
     arguments = parser.parse_args()
     if arguments.version:
         from poliora import __version__
 
         print(f"poliora {__version__}")
         return
-    if hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-
-    print("=" * 60)
-    print(" [Poliora] Starting Desktop AI Cost Optimizer...")
-    print("=" * 60)
 
     existing_port = _running_dashboard_port(arguments.port)
     if existing_port is not None:
-        if not arguments.no_open:
-            webbrowser.open_new_tab(f"http://127.0.0.1:{existing_port}")
+        # Never open a browser from the installed app. The existing Poliora window remains the active application.
         return
 
     workspace_root = _desktop_workspace_root()
     workspace = load_workspace(workspace_root)
-    if not workspace.config_path.exists():
+    is_first_launch = not workspace.config_path.exists()
+    if is_first_launch:
         init_workspace(workspace_root, project="Desktop", monthly_budget_usd=1000.0)
 
     port = _available_port(arguments.port)
-    url = f"http://127.0.0.1:{port}"
-    print(f"\n[+] Poliora engine running at {url}")
-    print("[+] Opening Desktop Application interface...")
+    server = create_dashboard_server(workspace_root, host="127.0.0.1", port=port)
+    if arguments.no_open:
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+        return
 
-    # Open browser window automatically after 0.5s
-    if not arguments.no_open:
-        Timer(0.5, webbrowser.open_new_tab, args=(url,)).start()
+    server_thread = Thread(target=server.serve_forever, daemon=True, name="poliora-local-engine")
+    server_thread.start()
+    # An empty workspace needs the same guided detection whether it is brand-new or migrated from an older app release.
+    url = f"http://127.0.0.1:{port}/?desktop-first-run=1"
 
-    # Serve local dashboard server
     try:
-        run_dashboard(workspace_root, host="127.0.0.1", port=port)
-    except KeyboardInterrupt:
-        print("\nPoliora closed. Goodbye!")
-        sys.exit(0)
+        _run_native_window(url)
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=2)
 
 
 if __name__ == "__main__":

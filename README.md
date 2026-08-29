@@ -40,7 +40,7 @@ poliora detect --import
 poliora dashboard
 ```
 
-The dashboard opens at `http://127.0.0.1:8787`. It creates a `.poliora` workspace beside the folder where you run the command. The desktop installer uses a private per-user workspace instead.
+The command-line dashboard opens at `http://127.0.0.1:8787`. The installed desktop edition opens the same local dashboard inside its own Poliora application window, not a browser. Both keep data in a private per-user workspace.
 
 ## Install And Open
 

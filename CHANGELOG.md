@@ -2,6 +2,17 @@
 
 All notable Poliora changes are documented here.
 
+## 0.2.2 - Native Desktop Polish
+
+### Added
+
+- A native Poliora application window on Windows and macOS. The dashboard is now contained inside the installed app instead of opening a browser.
+- A branded Poliora executable, installer, Start menu entry, and desktop shortcut icon.
+- An immediate, consent-based local-history preview on the first desktop launch. Detected metadata is only saved when the user approves it.
+
+### Changed
+
+- A second launch now leaves the existing Poliora desktop window in place instead of opening a browser tab.
 ## 0.2.1 - First-Run Desktop Experience
 
 ### Added

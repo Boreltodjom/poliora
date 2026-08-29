@@ -1361,8 +1361,16 @@ def _dashboard_page() -> str:
       }
       byId('load-demo').click();
     }));
-    activateView(window.location.hash.slice(1) || 'welcome', false);
-    loadOverview().catch(error => { document.body.innerHTML = '<main><p class="error">Could not load Poliora data: ' + escapeHtml(error.message) + '</p></main>'; });
+    async function initializeDashboard() {
+      activateView(window.location.hash.slice(1) || 'welcome', false);
+      await loadOverview();
+      const isDesktopFirstRun = new URLSearchParams(window.location.search).get('desktop-first-run') === '1';
+      if (isDesktopFirstRun && overview.report.requests === 0) {
+        activateView('connections');
+        setTimeout(() => detectHistory(), 0);
+      }
+    }
+    initializeDashboard().catch(error => { document.body.innerHTML = '<main><p class="error">Could not load Poliora data: ' + escapeHtml(error.message) + '</p></main>'; });
   </script>
 </body>
 </html>"""

@@ -1,6 +1,6 @@
 [project]
 name = "poliora"
-version = "0.2.1"
+version = "0.2.2"
 description = "AI cost, carbon, and fine-tuning efficiency toolkit."
 authors = [{ name = "Poliora Contributors" }]
 readme = "README.md"
@@ -24,6 +24,7 @@ dependencies = [
     "httpx>=0.25",
     "rich>=13.0",
     "typer>=0.9,<1.0",
+    "pywebview>=5.4,<7.0",
 ]
 
 [project.scripts]
