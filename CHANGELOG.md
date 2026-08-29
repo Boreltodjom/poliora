@@ -2,6 +2,29 @@
 
 All notable Poliora changes are documented here.
 
+## 0.2.3 - Launch Copy Accuracy
+
+### Fixed
+
+- The homepage sample output showed an equivalent API value that the shipped
+  pricing catalog cannot produce ($153.00 for 4.2M tokens on `gpt-5.6-sol`,
+  whose ceiling is $126.00), and mixed one tool's request count with another
+  tool's model. It now shows an engine-verified example with its token split
+  and per-1M arithmetic printed alongside it, so the figure can be checked.
+- The savings FAQ now states plainly that model routing saves nothing on a flat
+  subscription, where the lever is right-sizing the plan instead.
+
+### Changed
+
+- The package summary now describes what Poliora does -- find the AI coding
+  usage your tools already recorded locally -- instead of leading with the
+  legacy carbon and fine-tuning framing. Keywords retargeted accordingly.
+- The headline statistic no longer leads with a savings percentage that most
+  visitors, being on flat subscriptions, cannot realize.
+- Download cards now set expectations for the unsigned Windows installer and
+  un-notarized macOS app, so the first-run security warning is not mistaken
+  for a malware signal.
+
 ## 0.2.2 - Native Desktop Polish
 
 ### Added

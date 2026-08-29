@@ -1,12 +1,13 @@
 [project]
 name = "poliora"
-version = "0.2.2"
-description = "AI cost, carbon, and fine-tuning efficiency toolkit."
+version = "0.2.3"
+description = "Find the AI coding usage your tools already recorded locally, and see what it is really worth."
 authors = [{ name = "Poliora Contributors" }]
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11,<4.0"
-keywords = ["llm", "ai-finops", "cost-tracking", "sustainability", "carbon-tracking", "lora", "quantization"]
+keywords = ["llm", "ai-finops", "cost-tracking", "claude-code", "codex", "token-usage",
+            "ai-coding-tools", "sustainability", "carbon-tracking"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

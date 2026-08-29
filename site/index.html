@@ -678,8 +678,8 @@
         <!-- Trust Stats -->
         <div class="stats-row">
           <div class="stat-card">
-            <div class="stat-val highlight">Up to 95%</div>
-            <div class="stat-lbl">Modeled savings potential</div>
+            <div class="stat-val highlight">2 min</div>
+            <div class="stat-lbl">To see usage you couldn&#39;t before</div>
           </div>
           <div class="stat-card">
             <div class="stat-val">Local</div>
@@ -715,10 +715,11 @@
           <code class="terminal-line"><span class="green">$</span> poliora detect</code>
           <code class="terminal-line">Reading what your AI tools already recorded locally</code>
           <code class="terminal-line">&nbsp;</code>
-          <code class="terminal-line"><strong>Codex CLI</strong> &nbsp; ChatGPT plan &nbsp; 876 requests &nbsp; 4.2M tokens</code>
-          <code class="terminal-line"><strong>Most used model</strong> &nbsp; gpt-5.6-sol</code>
-          <code class="terminal-line"><strong>Equivalent API value</strong> &nbsp; <span class="green">$153.00</span></code>
-          <p class="terminal-caption">Illustrative output. Your result comes only from the supported local history on your own computer.</p>
+          <code class="terminal-line"><strong>Claude Code</strong> &nbsp; Max plan &nbsp; 840 requests &nbsp; 190M tokens</code>
+          <code class="terminal-line"><strong>Most used model</strong> &nbsp; claude-opus-5</code>
+          <code class="terminal-line">&nbsp; 6M input &middot; 180M cached &middot; 4M output</code>
+          <code class="terminal-line"><strong>Equivalent API value</strong> &nbsp; <span class="green">$220.00</span></code>
+          <p class="terminal-caption">Illustrative output, priced with the same catalog Poliora ships: 6M &times; $5 + 180M &times; $0.50 + 4M &times; $25 per 1M tokens. Agent sessions are mostly cache reads, which is why the token count is large and the value is not. Your result comes only from the supported local history on your own computer.</p>
         </div>
       </div>
     </section>
@@ -836,7 +837,7 @@
           </details>
           <details>
             <summary>Can Poliora save up to 95 percent on AI costs?</summary>
-            <p>The calculator shows a best-case routing scenario, not a guarantee. Actual savings depend on approved models, usage, contract rates, and output-quality testing. Poliora keeps modeled savings separate from proven savings.</p>
+            <p>The calculator shows a best-case routing scenario, not a guarantee. It applies to usage billed per token. <strong>If you are on a flat subscription such as Claude Max or ChatGPT Plus, switching models saves nothing</strong> &mdash; that fee is already paid, and the lever is right-sizing the plan instead. Actual savings depend on approved models, usage, contract rates, and output-quality testing. Poliora keeps modeled savings separate from proven savings.</p>
           </details>
           <details>
             <summary>Which AI tools work with Poliora today?</summary>
@@ -867,6 +868,7 @@
               Download for Windows
             </a>
             <p class="result-sub" style="margin-top: 14px;">Your history stays on this computer. The installer opens Poliora when setup finishes.</p>
+            <p class="result-sub" style="margin-top: 8px;"><strong>Heads up:</strong> Poliora is not code-signed yet, so Windows SmartScreen will warn you. Choose <em>More info</em> then <em>Run anyway</em>. You can verify the download against the checksum on the <a href="https://github.com/Boreltodjom/poliora/releases/latest">release page</a>.</p>
           </div>
 
           <!-- macOS Card -->
@@ -876,6 +878,7 @@
             <a href="https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS.zip" class="btn btn-outline" style="width: 100%;">
               Download for macOS
             </a>
+            <p class="result-sub" style="margin-top: 14px;"><strong>Heads up:</strong> Poliora is not notarized yet, so macOS will block the first open. Right-click Poliora in Applications and choose <em>Open</em>, then confirm once.</p>
           </div>
         </div>
       </div>

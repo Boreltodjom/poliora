@@ -25,7 +25,7 @@ from poliora import __version__
 
 app = typer.Typer(
     name="poliora",
-    help="Poliora - AI cost, carbon, and fine-tuning efficiency toolkit.",
+    help="Poliora - find the AI coding usage your tools already recorded locally.",
     add_completion=False,
     rich_markup_mode="rich",
 )
