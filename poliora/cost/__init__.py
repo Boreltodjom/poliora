@@ -6,6 +6,14 @@ from poliora.cost.antigravity import (
     record_antigravity_hook_event,
 )
 from poliora.cost.budget import BudgetCheck, check_budget
+from poliora.cost.capacity import (
+    CapacityCeiling,
+    RunwayForecast,
+    ThrottleEvent,
+    estimate_ceiling,
+    forecast_runway,
+    read_throttle_events,
+)
 from poliora.cost.capture import (
     CapturedCall,
     track_anthropic_call,
@@ -66,7 +74,13 @@ from poliora.cost.workspace import PolioraWorkspace, init_workspace, load_worksp
 __all__ = [
     "CapturedCall",
     "AntigravityPluginInstall",
+    "CapacityCeiling",
     "CatalogModel",
+    "RunwayForecast",
+    "ThrottleEvent",
+    "estimate_ceiling",
+    "forecast_runway",
+    "read_throttle_events",
     "CodexCli",
     "ConnectorConnection",
     "ConnectorDefinition",

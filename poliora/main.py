@@ -825,6 +825,107 @@ def detect_command(
         console.print("\n[dim]Run with --import to add these to your workspace usage log.[/dim]")
 
 
+@app.command("runway")
+def runway_command(
+    window: str = typer.Option("five_hour", "--window", help="Which limit window: five_hour or weekly."),
+    plan_tokens: Optional[int] = typer.Option(
+        None, "--plan-tokens", min=1, help="Published plan ceiling to use until a refusal is observed."
+    ),
+    statusline: bool = typer.Option(False, "--statusline", help="Emit one compact line for a status bar."),
+    as_json: bool = typer.Option(False, "--json", help="Emit the forecast as JSON."),
+) -> None:
+    """Show how much subscription capacity is left before the next limit."""
+    from poliora.cost.capacity import forecast_runway, read_throttle_events
+    from poliora.cost.local_usage import read_claude_code_usage, read_codex_usage
+
+    scan = read_claude_code_usage()
+    throttles = read_throttle_events()
+    forecast = forecast_runway(
+        list(scan.events), throttles, window=window, prior_tokens=plan_tokens
+    )
+
+    if as_json:
+        typer.echo(json.dumps(forecast.to_dict(), indent=2))
+        return
+
+    if statusline:
+        typer.echo(_statusline(forecast, read_codex_usage()))
+        return
+
+    _banner("Subscription capacity")
+    if not scan.available:
+        console.print("[yellow]No Claude Code session logs were found on this computer.[/yellow]")
+        return
+
+    console.print(f"[bold]{forecast.headline()}[/bold]\n")
+
+    table = Table(show_header=False, box=None)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Window", "5 hours" if forecast.window == "five_hour" else "7 days")
+    table.add_row("Used", f"{forecast.used_tokens:,} tokens")
+    if forecast.ceiling.is_known:
+        table.add_row("Estimated ceiling", f"{forecast.ceiling.tokens:,} tokens")
+        table.add_row("Remaining", f"{forecast.remaining_tokens:,} tokens")
+    table.add_row("Current burn", f"{forecast.burn_tokens_per_hour:,.0f} tokens/hour")
+    # A wall time is only meaningful while capacity remains; once the window is
+    # spent the headline already says so, and "wall: now" reads as a glitch.
+    if forecast.exhausted_at and (forecast.remaining_tokens or 0) > 0:
+        table.add_row("Projected wall", forecast.exhausted_at.astimezone().strftime("%a %H:%M"))
+    if forecast.resets_at:
+        table.add_row("Window resets", forecast.resets_at.astimezone().strftime("%a %H:%M"))
+    console.print(table)
+
+    console.print(f"\n[dim]{forecast.ceiling.describe()}[/dim]")
+    if not forecast.ceiling.is_known:
+        console.print(
+            "[dim]Pass --plan-tokens to estimate against your published plan limit "
+            "until Poliora measures one.[/dim]"
+        )
+
+    codex = read_codex_usage()
+    advice = _arbitrage_advice(forecast, codex)
+    if advice:
+        console.print(Panel(advice, title="[bold green]Spare capacity elsewhere[/bold green]", border_style="green"))
+
+
+def _statusline(forecast, codex) -> str:
+    """Render one compact line for a status bar."""
+    parts = []
+    share = forecast.used_pct
+    parts.append(f"{share:.0f}% used" if share is not None else f"{forecast.used_tokens/1e6:.1f}M tok")
+    if forecast.ceiling.is_known and (forecast.remaining_tokens or 0) <= 0:
+        # Past the estimated ceiling: a countdown here would read as "you have
+        # time" at exactly the moment the user does not.
+        parts.append("window spent")
+    elif (remaining := forecast.time_remaining()) is not None and forecast.exhausted_at:
+        from poliora.cost.capacity import _humanize
+
+        parts.append(f"~{_humanize(remaining)} left")
+    if codex.available and codex.plan and codex.plan.quota_used_pct is not None:
+        parts.append(f"Codex {codex.plan.quota_used_pct:.0f}%")
+    return "Poliora " + " | ".join(parts)
+
+
+def _arbitrage_advice(forecast, codex) -> str:
+    """Suggest shifting work when one plan is strained and another is idle.
+
+    This is the comparison no single vendor can make: Anthropic cannot see a
+    Codex quota, and OpenAI cannot see a Claude window.
+    """
+    if not codex.available or codex.plan is None or codex.plan.quota_used_pct is None:
+        return ""
+    codex_used = codex.plan.quota_used_pct
+    claude_used = forecast.used_pct
+    if claude_used is None or claude_used < 60 or codex_used > 40:
+        return ""
+    return (
+        f"Claude is at {claude_used:.0f}% of this window while Codex sits at {codex_used:.0f}%.\n"
+        "Routing mechanical work -- tests, refactors, boilerplate -- to Codex today\n"
+        "extends your Claude runway without changing the quality of the hard parts."
+    )
+
+
 @app.command()
 def train(
     model: str = typer.Option(
