@@ -249,9 +249,18 @@ def estimate_ceiling(
     ]
     usable = [value for value in observations if value > 0]
     if usable:
+        # A refusal can land in a window that happens to be light -- a weekly
+        # limit biting while the five-hour window is nearly empty, or usage
+        # from a session this machine cannot see. Taken alone that yields an
+        # absurdly low ceiling and every window afterwards reads "exhausted".
+        #
+        # The guard is a fact rather than a fudge: any window the person
+        # actually completed proves the ceiling is at least that high, so the
+        # estimate is never allowed below the busiest window on record.
+        achieved = _busiest_window(events, window=window)
         return CapacityCeiling(
             window=window,
-            tokens=int(statistics.median(usable)),
+            tokens=int(max(statistics.median(usable), achieved)),
             basis=OBSERVED,
             observations=len(usable),
         )
@@ -617,3 +626,32 @@ def peak_context(
         samples=len(active),
         lookback_days=lookback_days,
     )
+
+
+def _busiest_window(
+    events: Sequence[UsageEvent],
+    *,
+    window: str,
+    step: timedelta = timedelta(minutes=30),
+) -> int:
+    """The most tokens seen in any window across the recorded history.
+
+    This is a demonstrated lower bound on capacity: the person reached that
+    level, so the true ceiling cannot be below it.
+    """
+    epochs, prefix = _timeline(events)
+    if not epochs:
+        return 0
+    length = _window_length(window)
+    start = datetime.fromtimestamp(epochs[0], tz=timezone.utc) + length
+    end = datetime.fromtimestamp(epochs[-1], tz=timezone.utc)
+    step_seconds = max(step.total_seconds(), 300)
+
+    busiest = 0
+    cursor = start
+    while cursor <= end + length:
+        busiest = max(
+            busiest, _window_total(epochs, prefix, (cursor - length).timestamp(), cursor.timestamp())
+        )
+        cursor += timedelta(seconds=step_seconds)
+    return busiest

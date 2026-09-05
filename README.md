@@ -42,6 +42,21 @@ poliora dashboard
 
 The command-line dashboard opens at `http://127.0.0.1:8787`. The installed desktop edition opens the same local dashboard inside its own Poliora application window, not a browser. Both keep data in a private per-user workspace.
 
+## Which Install Do I Need?
+
+**Most people want the app.** The Windows and macOS downloads bundle their own
+Python runtime, so nothing needs to be installed first:
+
+- [Download for Windows](https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-Setup-Windows.exe)
+- [Download for macOS](https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS.zip)
+
+Neither is code-signed yet, so Windows SmartScreen will warn once (choose
+*More info* then *Run anyway*) and macOS will need a right-click then *Open*.
+
+**`pip install` is for developers** and needs **Python 3.11 or newer** already
+on the machine. Check with `python --version`. If that command is not found,
+use the app download above instead.
+
 ## Install And Open
 
 For a regular desktop installation, use the Windows or macOS download from the Poliora website. The Windows installer includes its own runtime and creates a Start menu and desktop shortcut; Python is not required.
@@ -52,6 +67,26 @@ dependencies are much larger:
 ```bash
 pip install "poliora[training]"
 ```
+
+## Background Warnings
+
+Poliora can warn you before a plan limit stops your work, instead of after:
+
+```bash
+poliora watch --install-autostart
+```
+
+That writes one ordinary file in your own home folder so the watcher starts at
+login, and `poliora watch --remove-autostart` deletes it. `poliora watch --status`
+shows what is configured and where.
+
+By default it warns once per window at 80 percent used, once if the limit is
+reached, and mentions another plan you already pay for when that one is idle.
+It does **not** announce which tools are running unless you ask for that with
+`--announce-tools`; knowing your editor opened is not worth an interruption.
+
+It reads the same content-free metadata as the rest of Poliora, plus the names
+of supported AI tools that are running. Nothing is uploaded.
 
 ## Install For Development
 

@@ -13,7 +13,7 @@ function updateCalculator() {
 }
 
 async function copyCliCommand() {
-  const command = "poliora detect";
+  const command = "pip install poliora && poliora detect";
   const button = document.querySelector(".copy-btn");
   try {
     await navigator.clipboard.writeText(command);

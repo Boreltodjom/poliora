@@ -2,6 +2,42 @@
 
 All notable Poliora changes are documented here.
 
+## 0.5.0 - Background Warnings
+
+### Added
+
+- `poliora watch` warns before a plan limit stops your work rather than after.
+  It warns once per window at 80 percent used, once if the limit is reached,
+  and mentions another plan you already pay for when that one is idle.
+- `poliora watch --install-autostart` starts the watcher at login by writing
+  one ordinary file in your own home folder -- a Startup script on Windows, a
+  LaunchAgent on macOS, a desktop entry on Linux. Something that starts itself
+  should be inspectable and deletable, not buried in a registry or a service.
+- Desktop notifications with no new dependency, using what each platform
+  already ships. A missing notifier or a muted session ends one cycle, never
+  the watcher.
+- Detection of which supported AI tools are running, by process *name* only.
+  Never command lines, which on a coding tool routinely contain file paths and
+  prompts. Unrecognized processes are not recorded, counted, or reported.
+
+### Fixed
+
+- Windows toasts silently timed out. Windows will not notify on behalf of an
+  application id it does not know, and a pip install cannot register one, so
+  the toast is now raised under PowerShell's own registered id.
+- `autostart` ignored an explicit home directory on Windows and Linux and
+  resolved to the real Startup folder instead, so a caller passing a temporary
+  directory could have deleted somebody's actual login entry.
+- A refusal landing in a light window pegged the measured ceiling to almost
+  nothing, after which every window read "exhausted". The ceiling is now never
+  estimated below the busiest window the person actually completed.
+
+### Changed
+
+- The site and README now say plainly that `pip install` needs Python 3.11+,
+  and point anyone without it to the desktop downloads, which bundle their own
+  runtime and need nothing installed first.
+
 ## 0.4.0 - Capacity, Attribution, and Advice
 
 On a flat plan the scarce resource is capacity, not money. The fee is paid

@@ -1139,6 +1139,92 @@ def advise_command(
         )
 
 
+@app.command("watch")
+def watch_command(
+    interval: int = typer.Option(120, "--interval", min=15, help="Seconds between checks."),
+    once: bool = typer.Option(False, "--once", help="Check a single time and exit."),
+    announce_tools: bool = typer.Option(
+        False, "--announce-tools", help="Also notify when a supported AI tool starts running."
+    ),
+    threshold: float = typer.Option(80.0, "--threshold", min=1, max=99, help="Warn at this percent used."),
+    install_autostart: bool = typer.Option(False, "--install-autostart", help="Start watching at login."),
+    remove_autostart: bool = typer.Option(False, "--remove-autostart", help="Stop watching at login."),
+    show_status: bool = typer.Option(False, "--status", help="Show watcher and notification status."),
+) -> None:
+    """Warn before an AI plan limit is reached, in the background."""
+    from datetime import timedelta as _timedelta
+
+    from poliora import autostart, notify
+    from poliora.cost import load_workspace
+    from poliora.cost.processes import running_tools
+    from poliora.watcher import WatchSettings, run_once
+    from poliora.watcher import watch as watch_loop
+
+    state_path = load_workspace(".").workspace_dir / "watch-state.json"
+
+    if install_autostart and remove_autostart:
+        console.print("[red]Choose either --install-autostart or --remove-autostart.[/red]")
+        raise typer.Exit(code=1)
+
+    if remove_autostart:
+        result = autostart.remove()
+        if not result.supported:
+            console.print(f"[yellow]{result.detail}[/yellow]")
+            raise typer.Exit(code=1)
+        console.print(f"[green]Poliora will no longer start at login.[/green] ({result.path})")
+        return
+
+    if install_autostart:
+        result = autostart.install()
+        if not result.supported:
+            console.print(f"[yellow]{result.detail}[/yellow]")
+            raise typer.Exit(code=1)
+        console.print("[green]Poliora will start watching at login.[/green]")
+        console.print(f"[dim]Created {result.path}. Delete that file to undo it.[/dim]")
+        return
+
+    if show_status:
+        _banner("Background watcher")
+        auto = autostart.status()
+        table = Table(show_header=False, box=None)
+        table.add_column("Field", style="cyan")
+        table.add_column("Value")
+        table.add_row("Notifications", "available" if notify.is_available() else "not available here")
+        table.add_row("Starts at login", "yes" if auto.installed else "no")
+        if auto.path:
+            table.add_row("Login entry", str(auto.path))
+        table.add_row("State file", str(state_path))
+        tools = running_tools()
+        table.add_row("Tools running now", ", ".join(t.display_name for t in tools) if tools else "none detected")
+        console.print(table)
+        return
+
+    settings = WatchSettings(announce_tools=announce_tools, threshold_pct=threshold)
+
+    if not notify.is_available():
+        console.print("[yellow]This computer has no desktop notifier Poliora can use.[/yellow]")
+        console.print("[dim]On Linux install libnotify (notify-send). Watching will continue "
+                      "but nothing will pop up.[/dim]")
+
+    if once:
+        delivered = run_once(state_path=state_path, settings=settings)
+        console.print(f"[green]Checked once.[/green] {len(delivered)} notification(s) sent.")
+        for alert in delivered:
+            console.print(f"  [cyan]{alert.title}[/cyan] - {alert.body}")
+        return
+
+    _banner("Watching your AI capacity")
+    console.print(
+        f"[dim]Checking every {interval}s. Warns once per window at {threshold:.0f}% used, "
+        "and again if the limit is reached.[/dim]"
+    )
+    console.print("[dim]Press Ctrl+C to stop. Use --install-autostart to run it at login.[/dim]\n")
+    try:
+        watch_loop(state_path=state_path, settings=settings, interval=_timedelta(seconds=interval))
+    except KeyboardInterrupt:
+        console.print("\n[green]Stopped watching.[/green]")
+
+
 @app.command()
 def train(
     model: str = typer.Option(

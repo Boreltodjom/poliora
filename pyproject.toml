@@ -1,6 +1,6 @@
 [project]
 name = "poliora"
-version = "0.4.0"
+version = "0.5.0"
 description = "Find the AI coding usage your tools already recorded locally, and see what it is really worth."
 authors = [{ name = "Poliora Contributors" }]
 readme = "README.md"
