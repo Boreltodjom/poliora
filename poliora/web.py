@@ -23,6 +23,7 @@ from poliora.cost import (
     SavedScenario,
     SavingsDecision,
     ScenarioStore,
+    SubscriptionStore,
     UsageEvent,
     build_usage_report,
     connector_catalog,
@@ -30,12 +31,15 @@ from poliora.cost import (
     generate_recommendations,
     import_usage_csv_text,
     init_workspace,
+    install_antigravity_plugin,
     load_workspace,
+    new_subscription_plan,
     preview_usage_csv_text,
     render_html_report,
     scan_local_usage,
     simulate_model_switch,
     summarize_decisions,
+    summarize_plan_stack,
 )
 
 
@@ -145,6 +149,8 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
             "/api/import",
             "/api/detect-tools",
             "/api/detect-history",
+            "/api/subscriptions",
+            "/api/antigravity/install",
         } and connector_action is None:
             self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
@@ -164,6 +170,10 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
                 result = self._detect_tools()
             elif path == "/api/detect-history":
                 result = self._detect_history(payload)
+            elif path == "/api/antigravity/install":
+                result = self._install_antigravity(payload)
+            elif path == "/api/subscriptions":
+                result = self._save_subscription(payload)
             elif path == "/api/decisions":
                 result = self._save_decision(payload)
             elif connector_action is not None:
@@ -213,6 +223,26 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
             ),
         }
 
+    def _install_antigravity(self, payload: dict[str, Any]) -> dict[str, object]:
+        """Install the activity-only Antigravity helper after explicit app approval."""
+        workspace = load_workspace(self.root)
+        scope = str(payload.get("scope") or "editor-global")
+        result = install_antigravity_plugin(workspace.root, scope=scope)
+        return {
+            "scope": result.scope,
+            "path": str(result.path),
+            "notice": (
+                "Poliora installed the Antigravity activity helper. Restart Antigravity or reload "
+                "customizations. It records activity only: Antigravity does not expose a complete "
+                "token or billing history through this helper."
+            ),
+        }
+    def _save_subscription(self, payload: dict[str, Any]) -> dict[str, object]:
+        """Save a person-confirmed monthly plan in this local workspace."""
+        workspace = load_workspace(self.root)
+        plan = new_subscription_plan(payload)
+        saved = SubscriptionStore(workspace.subscriptions_path).save(plan)
+        return {"subscription": saved.to_dict()}
     def do_PATCH(self) -> None:  # noqa: N802
         if not self._guard(mutating=True):
             return
@@ -235,20 +265,21 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
         request = urlparse(self.path)
         scenario_id = _resource_id(request.path, "/api/scenarios/")
         decision_id = _resource_id(request.path, "/api/decisions/")
-        if scenario_id is None and decision_id is None:
+        subscription_id = _resource_id(request.path, "/api/subscriptions/")
+        if scenario_id is None and decision_id is None and subscription_id is None:
             self._send_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
         workspace = load_workspace(self.root)
-        deleted = (
-            ScenarioStore(workspace.scenarios_path).delete(scenario_id)
-            if scenario_id is not None
-            else DecisionStore(workspace.decisions_path).delete(str(decision_id))
-        )
+        if scenario_id is not None:
+            deleted = ScenarioStore(workspace.scenarios_path).delete(scenario_id)
+        elif decision_id is not None:
+            deleted = DecisionStore(workspace.decisions_path).delete(str(decision_id))
+        else:
+            deleted = SubscriptionStore(workspace.subscriptions_path).delete(str(subscription_id))
         if not deleted:
             self._send_json({"error": "Record was not found."}, status=HTTPStatus.NOT_FOUND)
             return
         self._send_json({"deleted": True})
-
     def _overview(self, *, since_days: int | None = None) -> dict[str, object]:
         workspace = load_workspace(self.root)
         store = JsonlUsageStore(workspace.usage_path)
@@ -258,12 +289,15 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
         catalog = ModelCatalog.load(workspace.catalog_path)
         models = _catalog_rows(catalog, registry, events)
         decisions = DecisionStore(workspace.decisions_path).read_all()
+        subscriptions = SubscriptionStore(workspace.subscriptions_path).read_all()
+        plan_stack = summarize_plan_stack(subscriptions, events, report)
         data_quality = _data_quality(events, registry)
         return {
             "project": workspace.project,
             "currency": workspace.currency,
             "report": report.to_dict(),
             "recommendations": [item.to_dict() for item in generate_recommendations(report)],
+            "plan_stack": plan_stack,
             "models": models,
             "connectors": _connector_rows(workspace),
             "scenarios": [item.to_dict() for item in ScenarioStore(workspace.scenarios_path).read_all()],
@@ -692,6 +726,8 @@ def _dashboard_page() -> str:
     .recommendations { margin-top: 14px; }
     .recommendation { display: grid; grid-template-columns: 92px 1fr auto; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line); }
     .recommendation:last-child { border-bottom: 0; padding-bottom: 0; }
+    .recommendation:has([data-delete-subscription]) { grid-template-columns: 130px 1fr auto auto; }
+    .recommendation:has([data-delete-subscription]) button { align-self: start; margin-top: 0; }
     .tag { align-self: start; color: var(--amber); background: var(--amber-soft); border-radius: 99px; font-size: 12px; font-weight: 750; padding: 4px 8px; text-align: center; }
     .recommendation h3 { margin: 0; font-size: 14px; }
     .recommendation p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
@@ -876,21 +912,21 @@ def _dashboard_page() -> str:
       </section>
       <section class="view" data-view="overview">
         <header class="view-heading"><div><p class="view-kicker">Your activity</p><h1>Your AI check-in</h1><p class="summary">See what Poliora can measure, find the biggest cost drivers, and keep estimates separate from proven savings.</p></div><div class="evidence-seal" id="evidence-seal"></div></header>
-        <section class="launch-strip"><div><strong>Your next useful action</strong><p id="guide-status"></p></div><button id="open-guide" type="button">Open field guide</button></section>
+        <section class="launch-strip"><div><strong>Your next useful action</strong><p id="guide-status"></p></div><button id="open-guide" type="button">Open field guide</button></section><section class="panel" id="plan-stack-summary"></section>
         <div class="demo-action" id="demo-action"><button id="load-demo" type="button">Load guided sample data</button><span id="demo-message">Use fictional data to explore every dashboard control safely.</span></div>
         <section class="metrics" id="metrics"></section>
         <section class="ledger-ribbon" id="ledger-ribbon"></section>
         <section class="filters" aria-label="Reporting period"><button class="filter active" type="button" data-days="">All time</button><button class="filter" type="button" data-days="7">7 days</button><button class="filter" type="button" data-days="30">30 days</button></section>
         <section class="grid"><article class="panel"><h2>Cost fingerprint</h2><p class="panel-note">The shape of this workspace across providers, workflows, and models.</p><div class="fingerprint"><div class="fingerprint-column"><h3>Provider</h3><div id="fingerprint-providers"></div></div><div class="fingerprint-column"><h3>Workflow</h3><div id="fingerprint-workflows"></div></div><div class="fingerprint-column"><h3>Model</h3><div id="fingerprint-models"></div></div></div></article><article class="budget-box" id="budget"></article></section>
-        <section class="grid"><article class="panel"><h2>Spend over time</h2><p class="panel-note">Daily tracked spend in the selected reporting period.</p><div id="trend"></div><div id="spend-watch"></div></article><article class="panel"><h2>Data quality</h2><p class="panel-note">Coverage indicates whether rate-based estimates are trustworthy.</p><div id="quality"></div></article></section>
+        <section class="grid"><article class="panel"><h2>Spend over time</h2><p class="panel-note" id="trend-note">Daily tracked spend in the selected reporting period.</p><div id="trend"></div><div id="spend-watch"></div></article><article class="panel"><h2>Data quality</h2><p class="panel-note">Coverage indicates whether rate-based estimates are trustworthy.</p><div id="quality"></div></article></section>
         <section class="grid"><article class="panel"><h2>Cost drivers by model</h2><p class="panel-note">Prioritize the model routes carrying the most spend.</p><div id="drivers"></div></article><article class="panel"><h2>Spend by customer</h2><p class="panel-note">Find costly accounts and protect customer margins.</p><div id="customers"></div></article></section>
         <section class="panel recommendations"><h2>Recommended next moves</h2><div id="recommendations"></div></section>
       </section>
 
       <section class="view" data-view="connections">
-        <header class="view-heading"><div><p class="view-kicker">Your choices</p><h1>Add a tool or a bill</h1><p class="summary">Choose what Poliora may observe, or import a bill you are allowed to use. Every option explains what it can provide before setup.</p></div></header>
+        <header class="view-heading"><div><p class="view-kicker">Your choices</p><h1>Add a tool or a bill</h1><p class="summary">Choose what Poliora may observe, or import a bill you are allowed to use. Every option explains what it can provide before setup.</p></div></header><section class="panel"><h2>Your AI plans</h2><p class="panel-note">Add only the plans you pay for. This stays on this computer. Poliora compares them with local, content-free usage to help you decide what deserves renewal.</p><form id="subscription-form" class="form-grid"><label>Tool<select id="subscription-tool"><option value="codex">ChatGPT / Codex</option><option value="claude-code">Claude Code</option><option value="cursor">Cursor</option><option value="antigravity">Antigravity</option><option value="other">Other AI tool</option></select></label><label>Plan name<input id="subscription-name" maxlength="80" placeholder="ChatGPT Plus"></label><label>Monthly price (USD)<input id="subscription-price" type="number" min="0" max="100000" step="0.01" placeholder="20"></label><label>Renewal day (optional)<input id="subscription-renewal" type="number" min="1" max="31" step="1" placeholder="1"></label><div class="button-row"><button type="submit">Add plan</button></div></form><p class="form-error" id="subscription-error" role="alert"></p><div id="plan-stack-list"></div></section>
         <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Find the AI usage already recorded here</h2><p>For Codex and Claude Code, Poliora can review local usage metadata already written by those tools: timestamps, token totals, model, plan, and quota. It never reads prompts, replies, code, credentials, or chats. Review the result before adding anything to your dashboard.</p></div><button id="detect-history" type="button">Review local history</button></div><div id="history-results" class="tool-scan-results" hidden></div></section>
-        <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Check which other tools are ready</h2><p>This availability check only looks for supported launchers and the Poliora Antigravity workspace helper. It never opens a tool or reads account history.</p></div><button id="scan-tools" type="button">Check installed tools</button></div><div id="tool-scan-results" class="tool-scan-results" hidden></div></section>
+                <section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Connect Antigravity</h2><p>Set up Poliora's official lifecycle helper from inside the app. It records only that an agent invocation happened; it cannot see prompts, code, model tokens, or billing.</p></div><div><label>Where to connect<select id="antigravity-scope"><option value="editor-global">Antigravity desktop app</option><option value="cli-global">Antigravity CLI</option><option value="workspace">This workspace only</option></select></label><button id="install-antigravity" type="button">Connect Antigravity</button></div></div><p class="panel-note" id="antigravity-result"></p></section><section class="panel tool-scan"><div class="tool-scan-head"><div><h2>Check which other tools are ready</h2><p>This availability check only looks for supported launchers and the Poliora Antigravity workspace helper. It never opens a tool or reads account history.</p></div><button id="scan-tools" type="button">Check installed tools</button></div><div id="tool-scan-results" class="tool-scan-results" hidden></div></section>
         <section class="panel import-panel"><h2>Import existing usage</h2><p class="panel-note">Select a CSV to validate it locally before anything is written. Required information is model, input tokens, output tokens, and provider in the file or below.</p><div class="import-controls"><label>Usage CSV<input id="import-file" type="file" accept=".csv,text/csv"></label><label>Default provider<input id="import-provider" placeholder="openai"></label><label>Default project<input id="import-project" placeholder="Workspace project"></label></div><label class="check-line"><input id="import-skip-invalid" type="checkbox"> Import valid rows when some rows are rejected</label><div class="button-row"><button id="import-preview-button" type="button">Preview file</button><button class="secondary" id="import-commit" type="button" disabled>Import rows</button></div><div class="import-preview" id="import-preview" hidden></div></section>
         <section class="panel connection-center"><h2>Available data sources</h2><p class="panel-note">Poliora collects usage metadata and costs by default, never prompts, source code, or model replies. Approval here records consent; credentials are configured separately.</p><div id="connectors" class="connector-grid"></div></section>
       </section>
@@ -957,9 +993,10 @@ def _dashboard_page() -> str:
       return rows.length ? rows.slice(0, 6).map(row => `<div class="cost-row"><div class="cost-head"><span>${escapeHtml(row.name)}</span><strong>${money(row.cost_usd)}</strong></div><div class="bar"><i style="width:${Math.max(0, Math.min(100, row.share_pct))}%"></i></div></div>`).join('') : `<p class="empty">${emptyMessage}</p>`;
     }
     function renderTrend(rows) {
-      if (!rows.length) return '<p class="empty">No daily spend recorded yet.</p>';
-      const maximum = Math.max(...rows.map(row => row.cost_usd), 0.000001);
-      return rows.map(row => `<div class="trend-row"><span>${escapeHtml(row.date)}</span><div class="bar"><i style="width:${(row.cost_usd / maximum) * 100}%"></i></div><strong>${money(row.cost_usd)}</strong></div>`).join('');
+      if (!rows.length) return '<p class="empty">No daily usage recorded yet.</p>';
+      const key = rows.some(row => row.cost_usd > 0) ? 'cost_usd' : 'equivalent_api_value_usd';
+      const maximum = Math.max(...rows.map(row => row[key] || 0), 0.000001);
+      return rows.map(row => `<div class="trend-row"><span>${escapeHtml(row.date)}</span><div class="bar"><i style="width:${((row[key] || 0) / maximum) * 100}%"></i></div><strong>${money(row[key] || 0)}</strong></div>`).join('');
     }
     function ledgerMarkup(ledger) {
       return `<div class="ledger-title"><strong>Savings proof ledger</strong><p>${ledger.decisions.toLocaleString()} tracked decision${ledger.decisions === 1 ? '' : 's'} / ${ledger.validated.toLocaleString()} quality validated. Modeled value is never presented as money already saved.</p></div><div class="ledger-stat"><span>Modeled monthly</span><strong>${money(ledger.modeled_monthly_savings_usd)}</strong></div><div class="ledger-stat"><span>Active tests</span><strong>${ledger.active_tests.toLocaleString()}</strong></div><div class="ledger-stat"><span>Realized monthly</span><strong>${money(ledger.realized_monthly_savings_usd)}</strong></div>`;
@@ -968,12 +1005,22 @@ def _dashboard_page() -> str:
       if (!rows.length) return `<p class="empty">${emptyMessage}</p>`;
       return rows.slice(0, 4).map(row => `<div class="fingerprint-item"><div class="fingerprint-head"><span>${escapeHtml(row.name)}</span><strong>${row.share_pct.toFixed(0)}%</strong></div><div class="fingerprint-track"><i style="width:${Math.max(0, Math.min(100, row.share_pct))}%"></i></div></div>`).join('');
     }
+    function planStatusLabel(status) {
+      return ({healthy: 'In good shape', watch: 'Keep watching', review: 'Review before renewal', 'needs-usage': 'Needs matching usage'})[status] || 'Needs review';
+    }
+    function renderPlanStack(stack) {
+      const plans = stack.plans || [];
+      const rows = plans.length ? plans.map(plan => `<article class="recommendation"><div class="tag">${escapeHtml(planStatusLabel(plan.status))}</div><div><h3>${escapeHtml(plan.display_name)}</h3><p>${plan.requests_observed.toLocaleString()} matching local requests. ${escapeHtml(plan.explanation)}</p></div><div class="savings">${money(plan.monthly_cost_usd)} / mo<br><small>${money(plan.monthly_equivalent_api_value_usd)} value</small></div><button class="secondary" type="button" data-delete-subscription="${escapeHtml(plan.id)}">Remove</button></article>`).join('') : '<p class="empty">Add the plans you pay for. Poliora will keep the details on this computer and compare them with the history you approve.</p>';
+      byId('plan-stack-summary').innerHTML = `<div class="tool-scan-head"><div><p class="view-kicker">Your plan stack</p><h2>${escapeHtml(stack.headline)}</h2><p>${escapeHtml(stack.next_action)}</p></div><div><strong>${money(stack.monthly_equivalent_api_value_usd)} / mo</strong><p class="panel-note">equivalent API value</p><button id="refresh-history" type="button">Refresh local history</button></div></div><p class="panel-note">${escapeHtml(stack.notice)}</p><div id="overview-plan-rows">${rows}</div>`;
+      byId('plan-stack-list').innerHTML = plans.length ? `<div class="recommendations">${rows}</div>` : '<p class="empty">No plans added yet.</p>';
+    }
     function render() {
       const report = overview.report;
       byId('workspace').textContent = '/ ' + overview.project;
       const evidence = overview.evidence;
       byId('evidence-seal').innerHTML = `<span class="evidence-grade">${escapeHtml(evidence.grade)}</span><span class="evidence-copy"><strong>${escapeHtml(evidence.label)} / ${evidence.score}%</strong><span>${escapeHtml(evidence.next_action)}</span></span>`;
       byId('guide-status').textContent = evidence.next_action;
+      renderPlanStack(overview.plan_stack || {plans: [], headline: 'Your plan stack is not set up yet', monthly_equivalent_api_value_usd: 0, next_action: 'Add your plans to begin.', notice: ''});
       byId('demo-action').hidden = report.requests > 0;
       renderConnectors(overview.connectors || []);
       const connections = overview.connectors || [];
@@ -1005,6 +1052,8 @@ def _dashboard_page() -> str:
       byId('fingerprint-models').innerHTML = renderFingerprint(report.by_model, 'No models observed.');
       byId('drivers').innerHTML = renderBars(report.by_model, 'No tracked usage yet.');
       byId('budget').innerHTML = `<div><strong>${used}</strong><p>of monthly budget used</p><small>Budget remaining: ${budget === null ? 'Not set' : money(report.budget_delta_usd)}<br>Forecast confidence: ${escapeHtml(report.forecast_confidence)}<br>${escapeHtml(report.forecast_confidence_reason)}</small></div>`;
+      const hasTrackedSpend = report.daily_spend.some(row => row.cost_usd > 0);
+      byId('trend-note').textContent = hasTrackedSpend ? 'Daily tracked spend in the selected reporting period.' : 'Daily equivalent API value for subscription activity. This is a public-rate comparison, not a bill.';
       byId('trend').innerHTML = renderTrend(report.daily_spend);
       const anomalies = report.spend_anomalies || [];
       byId('spend-watch').className = anomalies.length ? 'spend-watch alert' : 'spend-watch';
@@ -1013,7 +1062,7 @@ def _dashboard_page() -> str:
       const quality = overview.data_quality;
       const missingModels = quality.unpriced_models.length ? quality.unpriced_models.map(escapeHtml).join(', ') : 'None';
       byId('quality').innerHTML = `<div class="quality-row"><span>Model-rate coverage</span><strong>${quality.rate_coverage_pct.toFixed(1)}%</strong></div><div class="quality-row"><span>Priced requests</span><strong>${quality.priced_requests.toLocaleString()}</strong></div><div class="quality-row"><span>Subscription turns excluded from spend</span><strong>${quality.non_dollar_requests.toLocaleString()}</strong></div><div class="quality-row"><span>Trace coverage</span><strong>${quality.trace_coverage_pct.toFixed(1)}%</strong></div><div class="quality-row"><span>Last recorded usage</span><strong>${quality.last_event_at ? escapeHtml(new Date(quality.last_event_at).toLocaleString()) : 'None'}</strong></div><div class="quality-row"><span>Unpriced models</span><strong>${missingModels}</strong></div><div class="quality-row"><span>Catalog entries</span><strong>${overview.catalog_health.catalog_models.toLocaleString()}</strong></div>`;
-      byId('recommendations').innerHTML = overview.recommendations.map(item => `<article class="recommendation"><div class="tag">${escapeHtml(item.priority)} priority</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.action)}</p></div><div class="savings">${money(item.estimated_monthly_savings_usd)} / mo</div></article>`).join('');
+      byId('recommendations').innerHTML = overview.recommendations.map(item => { const impact = item.estimated_monthly_savings_usd > 0 ? money(item.estimated_monthly_savings_usd) + ' / mo' : (report.cost_usd > 0 ? 'Measure impact' : 'Capacity action'); return `<article class="recommendation"><div class="tag">${escapeHtml(item.priority)} priority</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.action)}</p></div><div class="savings">${impact}</div></article>`; }).join('');
       renderDecisions(overview.decisions || []);
       renderScenarios(overview.scenarios || []);
       byId('table').innerHTML = report.by_model.length ? `<table><thead><tr><th>Model</th><th>Requests</th><th>Tokens</th><th>Cost</th><th>Share</th></tr></thead><tbody>${report.by_model.map(row => `<tr><td>${escapeHtml(row.name)}</td><td>${row.requests.toLocaleString()}</td><td>${row.total_tokens.toLocaleString()}</td><td>${money(row.cost_usd)}</td><td>${row.share_pct.toFixed(1)}%</td></tr>`).join('')}</tbody></table>` : '<p class="empty">Import a CSV or add the SDK to begin tracking.</p>';
@@ -1087,7 +1136,7 @@ def _dashboard_page() -> str:
         const response = await fetch('/api/detect-history', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({import: importHistory})});
         const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Could not read local history.');
         renderHistoryDetection(data);
-        if (importHistory) await loadOverview(activeDays);
+        if (importHistory) { localStorage.setItem('poliora-history-refresh-approved', 'true'); await loadOverview(activeDays); }
       } catch (error) {
         results.hidden = false; results.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
       } finally { button.disabled = false; button.textContent = 'Review local history'; }
@@ -1210,7 +1259,15 @@ def _dashboard_page() -> str:
         byId('connector-dialog').close(); await loadOverview(activeDays);
       } catch (problem) { error.textContent = problem.message; } finally { action.disabled = false; }
     });
-    byId('scan-tools').addEventListener('click', async () => {
+    byId('install-antigravity').addEventListener('click', async () => {
+      const button = byId('install-antigravity'); const result = byId('antigravity-result');
+      button.disabled = true; result.textContent = 'Connecting Antigravity...';
+      try {
+        const response = await fetch('/api/antigravity/install', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({scope: byId('antigravity-scope').value})});
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Could not connect Antigravity.');
+        result.textContent = data.notice;
+      } catch (error) { result.textContent = error.message; } finally { button.disabled = false; }
+    });    byId('scan-tools').addEventListener('click', async () => {
       const button = byId('scan-tools'); const results = byId('tool-scan-results');
       button.disabled = true; button.textContent = 'Scanning...'; results.hidden = true;
       try {
@@ -1221,7 +1278,27 @@ def _dashboard_page() -> str:
         results.hidden = false; results.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
       } finally { button.disabled = false; button.textContent = 'Scan this computer'; }
     });
-    byId('detect-history').addEventListener('click', () => detectHistory());
+    byId('subscription-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const error = byId('subscription-error'); error.textContent = '';
+      const payload = {tool: byId('subscription-tool').value, display_name: byId('subscription-name').value.trim(), monthly_cost_usd: byId('subscription-price').value, renewal_day: byId('subscription-renewal').value};
+      try {
+        const response = await fetch('/api/subscriptions', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Could not save this plan.');
+        byId('subscription-name').value = ''; byId('subscription-price').value = ''; byId('subscription-renewal').value = '';
+        await loadOverview(activeDays);
+      } catch (problem) { error.textContent = problem.message; }
+    });
+    document.addEventListener('click', async event => {
+      const button = event.target.closest('[data-delete-subscription]');
+      const refresh = event.target.closest('#refresh-history');
+      if (refresh) { detectHistory(true); return; }
+      if (!button) return;
+      if (!window.confirm('Remove this local plan from Poliora?')) return;
+      const response = await fetch('/api/subscriptions/' + encodeURIComponent(button.dataset.deleteSubscription), {method: 'DELETE'});
+      if (!response.ok) { const data = await response.json(); alert(data.error || 'Could not remove this plan.'); return; }
+      await loadOverview(activeDays);
+    });    byId('detect-history').addEventListener('click', () => detectHistory());
     byId('history-results').addEventListener('click', event => {
       if (event.target.closest('#import-detected-history')) detectHistory(true);
     });
@@ -1370,7 +1447,9 @@ def _dashboard_page() -> str:
         setTimeout(() => detectHistory(), 0);
       }
     }
-    initializeDashboard().catch(error => { document.body.innerHTML = '<main><p class="error">Could not load Poliora data: ' + escapeHtml(error.message) + '</p></main>'; });
+    if (localStorage.getItem('poliora-history-refresh-approved') === 'true') {
+      window.setInterval(() => detectHistory(true), 15 * 60 * 1000);
+    }    initializeDashboard().catch(error => { document.body.innerHTML = '<main><p class="error">Could not load Poliora data: ' + escapeHtml(error.message) + '</p></main>'; });
   </script>
 </body>
 </html>"""

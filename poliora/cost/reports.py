@@ -28,21 +28,21 @@ class BreakdownRow:
     share_pct: float
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize row."""
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class DailySpendRow:
-    """Spend and request volume for one UTC calendar day."""
+    """Spend, request volume, and optional subscription value for one UTC day."""
 
     date: str
     requests: int
     total_tokens: int
     cost_usd: float
+    equivalent_api_value_usd: float = 0.0
+    subscription_requests: int = 0
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize row."""
         return asdict(self)
 
 
@@ -57,7 +57,6 @@ class SpendAnomaly:
     severity: str
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize anomaly."""
         return asdict(self)
 
 
@@ -93,7 +92,6 @@ class UsageReport:
     spend_anomalies: list[SpendAnomaly] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize report."""
         return {
             "generated_at": self.generated_at,
             "period_start": self.period_start,
@@ -124,28 +122,19 @@ class UsageReport:
         }
 
     def write_json(self, path: str | Path) -> Path:
-        """Write report JSON."""
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
         return target
 
     def write_csv(self, path: str | Path) -> Path:
-        """Write model breakdown CSV."""
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("w", newline="", encoding="utf-8") as handle:
             fieldnames = [
-                "name",
-                "requests",
-                "input_tokens",
-                "output_tokens",
-                "cached_input_tokens",
-                "reasoning_tokens",
-                "total_tokens",
-                "cost_usd",
-                "tool_cost_usd",
-                "share_pct",
+                "name", "requests", "input_tokens", "output_tokens",
+                "cached_input_tokens", "reasoning_tokens", "total_tokens",
+                "cost_usd", "tool_cost_usd", "share_pct",
             ]
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
@@ -153,31 +142,16 @@ class UsageReport:
         return target
 
 
-def build_usage_report(
-    events: Iterable[UsageEvent],
-    *,
-    monthly_budget_usd: float | None = None,
-) -> UsageReport:
+def build_usage_report(events: Iterable[UsageEvent], *, monthly_budget_usd: float | None = None) -> UsageReport:
     """Aggregate usage events into a report."""
     event_list = list(events)
     now = datetime.now(timezone.utc).isoformat()
-
     if not event_list:
         return UsageReport(
-            generated_at=now,
-            period_start=None,
-            period_end=None,
-            observed_days=0.0,
-            requests=0,
-            input_tokens=0,
-            output_tokens=0,
-            cached_input_tokens=0,
-            reasoning_tokens=0,
-            total_tokens=0,
-            cost_usd=0.0,
-            tool_cost_usd=0.0,
-            projected_monthly_usd=0.0,
-            forecast_confidence="No data",
+            generated_at=now, period_start=None, period_end=None, observed_days=0.0,
+            requests=0, input_tokens=0, output_tokens=0, cached_input_tokens=0,
+            reasoning_tokens=0, total_tokens=0, cost_usd=0.0, tool_cost_usd=0.0,
+            projected_monthly_usd=0.0, forecast_confidence="No data",
             forecast_confidence_reason="Record usage across several days before relying on a forecast.",
             monthly_budget_usd=monthly_budget_usd,
             budget_delta_usd=monthly_budget_usd if monthly_budget_usd is not None else None,
@@ -186,52 +160,40 @@ def build_usage_report(
         )
 
     timestamps = [parse_timestamp(event.timestamp) for event in event_list]
-    start = min(timestamps)
-    end = max(timestamps)
+    start, end = min(timestamps), max(timestamps)
     observed_days = max((end - start).total_seconds() / 86400, 1.0)
-
     total_cost = round(sum(event.cost_usd for event in event_list), 6)
     projected_monthly = round(total_cost / observed_days * 30.44, 2)
     budget_delta = round(monthly_budget_usd - projected_monthly, 2) if monthly_budget_usd is not None else None
     budget_used_pct = round(projected_monthly / monthly_budget_usd * 100, 2) if monthly_budget_usd else None
-
     daily_spend = _daily_spend(event_list)
     confidence, confidence_reason = _forecast_confidence(observed_days)
 
     return UsageReport(
-        generated_at=now,
-        period_start=start.isoformat(),
-        period_end=end.isoformat(),
-        observed_days=round(observed_days, 2),
-        requests=len(event_list),
+        generated_at=now, period_start=start.isoformat(), period_end=end.isoformat(),
+        observed_days=round(observed_days, 2), requests=len(event_list),
         input_tokens=sum(event.input_tokens for event in event_list),
         output_tokens=sum(event.output_tokens for event in event_list),
         cached_input_tokens=sum(event.cached_input_tokens for event in event_list),
         reasoning_tokens=sum(event.reasoning_tokens for event in event_list),
-        total_tokens=sum(event.total_tokens for event in event_list),
-        cost_usd=total_cost,
+        total_tokens=sum(event.total_tokens for event in event_list), cost_usd=total_cost,
         tool_cost_usd=round(sum(event.tool_cost_usd for event in event_list), 6),
-        projected_monthly_usd=projected_monthly,
-        forecast_confidence=confidence,
-        forecast_confidence_reason=confidence_reason,
-        monthly_budget_usd=monthly_budget_usd,
-        budget_delta_usd=budget_delta,
-        budget_used_pct=budget_used_pct,
+        projected_monthly_usd=projected_monthly, forecast_confidence=confidence,
+        forecast_confidence_reason=confidence_reason, monthly_budget_usd=monthly_budget_usd,
+        budget_delta_usd=budget_delta, budget_used_pct=budget_used_pct,
         non_dollar_requests=sum(_is_non_dollar_activity(event) for event in event_list),
         by_model=_breakdown(event_list, lambda event: f"{event.provider}/{event.model}"),
         by_provider=_breakdown(event_list, lambda event: event.provider),
         by_operation=_breakdown(event_list, lambda event: event.operation),
         by_project=_breakdown(event_list, lambda event: event.project),
         by_user=_breakdown(event_list, lambda event: event.user or "Unassigned"),
-        daily_spend=daily_spend,
-        spend_anomalies=_spend_anomalies(daily_spend),
+        daily_spend=daily_spend, spend_anomalies=_spend_anomalies(daily_spend),
     )
 
 
 def _is_non_dollar_activity(event: UsageEvent) -> bool:
     return event.metadata.get("billing_basis") in {
-        "chatgpt-subscription",
-        "antigravity-subscription-activity",
+        "chatgpt-subscription", "subscription-included", "antigravity-subscription-activity",
     }
 
 
@@ -240,11 +202,9 @@ def _breakdown(events: list[UsageEvent], key_fn) -> list[BreakdownRow]:
     groups: dict[str, list[UsageEvent]] = {}
     for event in events:
         groups.setdefault(str(key_fn(event)), []).append(event)
-
     rows = [
         BreakdownRow(
-            name=name,
-            requests=len(group),
+            name=name, requests=len(group),
             input_tokens=sum(event.input_tokens for event in group),
             output_tokens=sum(event.output_tokens for event in group),
             cached_input_tokens=sum(event.cached_input_tokens for event in group),
@@ -266,13 +226,21 @@ def _daily_spend(events: list[UsageEvent]) -> list[DailySpendRow]:
         groups.setdefault(day, []).append(event)
     return [
         DailySpendRow(
-            date=day,
-            requests=len(group),
-            total_tokens=sum(event.total_tokens for event in group),
+            date=day, requests=len(group), total_tokens=sum(event.total_tokens for event in group),
             cost_usd=round(sum(event.cost_usd for event in group), 6),
+            equivalent_api_value_usd=round(sum(_equivalent_api_value(event) for event in group), 6),
+            subscription_requests=sum(_is_non_dollar_activity(event) for event in group),
         )
         for day, group in sorted(groups.items())
     ]
+
+
+def _equivalent_api_value(event: UsageEvent) -> float:
+    raw = event.metadata.get("equivalent_api_cost_usd", 0.0)
+    try:
+        return max(float(raw), 0.0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _forecast_confidence(observed_days: float) -> tuple[str, str]:

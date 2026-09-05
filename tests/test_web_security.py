@@ -226,3 +226,44 @@ def test_non_object_json_body_is_refused(dashboard: int) -> None:
 def test_malformed_json_body_is_refused(dashboard: int) -> None:
     status, _ = request(dashboard, "POST", "/api/simulate", body="{not json")
     assert status == 400
+
+
+def test_subscription_plan_can_be_saved_and_removed_locally(dashboard: int) -> None:
+    payload = json.dumps(
+        {"tool": "codex", "display_name": "ChatGPT Plus", "monthly_cost_usd": 20}
+    )
+    status, body = request(dashboard, "POST", "/api/subscriptions", body=payload)
+    assert status == 200
+    plan = json.loads(body)["subscription"]
+
+    status, body = request(dashboard, "GET", "/api/overview")
+    assert status == 200
+    assert json.loads(body)["plan_stack"]["monthly_cost_usd"] == 20.0
+
+    status, body = request(dashboard, "DELETE", f"/api/subscriptions/{plan['id']}")
+    assert status == 200
+    assert json.loads(body) == {"deleted": True}
+
+
+def test_forged_subscription_change_is_rejected(dashboard: int) -> None:
+    status, _ = request(
+        dashboard,
+        "POST",
+        "/api/subscriptions",
+        body=json.dumps({"tool": "codex", "display_name": "Plan", "monthly_cost_usd": 20}),
+        headers={"Origin": "https://evil.example.com"},
+    )
+    assert status == 403
+
+
+def test_antigravity_helper_installs_through_the_local_dashboard(dashboard: int) -> None:
+    status, body = request(
+        dashboard,
+        "POST",
+        "/api/antigravity/install",
+        body=json.dumps({"scope": "workspace"}),
+    )
+    assert status == 200
+    result = json.loads(body)
+    assert result["scope"] == "workspace"
+    assert "activity helper" in result["notice"]

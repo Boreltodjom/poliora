@@ -84,7 +84,7 @@ def install_antigravity_plugin(
 
     files = {
         "plugin.json": json.dumps({"name": "poliora"}, indent=2) + "\n",
-        "hooks.json": json.dumps(_hook_config(), indent=2) + "\n",
+        "hooks.json": json.dumps(_hook_config(Path(root).resolve()), indent=2) + "\n",
         "skills/poliora-cost/SKILL.md": _skill_markdown(),
         "rules/poliora-privacy.md": _privacy_rule_markdown(),
     }
@@ -117,13 +117,13 @@ def _plugin_path(root: Path, scope: str) -> Path:
     raise ValueError("scope must be workspace, editor-global, or cli-global")
 
 
-def _hook_config() -> dict[str, object]:
+def _hook_config(root: Path) -> dict[str, object]:
     return {
         "poliora-activity": {
             "PreInvocation": [
                 {
                     "type": "command",
-                    "command": _hook_command(),
+                    "command": _hook_command(root),
                     "timeout": 10,
                 }
             ]
@@ -131,12 +131,31 @@ def _hook_config() -> dict[str, object]:
     }
 
 
-def _hook_command() -> str:
-    arguments = [sys.executable, "-m", "poliora.main", "antigravity-hook", "--event", "pre-invocation"]
+def _hook_command(root: Path) -> str:
+    """Build a hook command that works from both source and packaged desktop app."""
+    if getattr(sys, "frozen", False):
+        arguments = [
+            sys.executable,
+            "antigravity-hook",
+            "--event",
+            "pre-invocation",
+            "--root",
+            str(root),
+        ]
+    else:
+        arguments = [
+            sys.executable,
+            "-m",
+            "poliora.main",
+            "antigravity-hook",
+            "--event",
+            "pre-invocation",
+            "--root",
+            str(root),
+        ]
     if os.name == "nt":
         return subprocess.list2cmdline(arguments)
     return shlex.join(arguments)
-
 
 def _skill_markdown() -> str:
     return """---

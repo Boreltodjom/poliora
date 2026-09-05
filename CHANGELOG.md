@@ -2,6 +2,28 @@
 
 All notable Poliora changes are documented here.
 
+## 0.3.0 - Daily Companion
+
+### Added
+
+- A private Plan Stack in the desktop app. People can add the monthly AI plans
+  they actually pay for and compare each one with their approved local usage.
+- An honest subscription-value view: public API-rate equivalents are labelled as
+  a comparison, never as an invoice or an automatic cancellation instruction.
+- A consented in-app history refresh for Codex and Claude Code, with optional
+  automatic refresh every fifteen minutes after a person has approved it.
+- One-click Antigravity helper setup from the desktop app. It records only
+  activity that Antigravity officially exposes; it does not claim token or
+  billing visibility where none exists.
+
+### Fixed
+
+- Subscription-included local sessions are now counted correctly instead of
+  appearing as unexplained zero-cost activity.
+- Dashboard recommendations no longer advertise `$0.00/mo` savings for flat
+  subscription usage; they describe the capacity or plan action instead.
+- The packaged desktop app can execute its own Antigravity hook without Python
+  being installed or a terminal command being required.
 ## 0.2.3 - Launch Copy Accuracy
 
 ### Fixed

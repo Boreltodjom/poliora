@@ -294,7 +294,7 @@ def test_model_catalog_includes_current_provider_families() -> None:
     assert PricingRegistry().estimate("openai", "gpt-5.5", 1_000_000, 1_000_000) == 35.0
     assert PricingRegistry().estimate("anthropic", "claude-opus-4-6", 1_000_000, 1_000_000) == 30.0
     assert PricingRegistry().estimate("anthropic", "claude-opus-4-8", 1_000_000, 1_000_000) == 30.0
-    assert PricingRegistry().estimate("anthropic", "claude-sonnet-5", 1_000_000, 1_000_000) == 12.0
+    assert PricingRegistry().estimate("anthropic", "claude-sonnet-5", 1_000_000, 1_000_000) == 18.0
 
 
 def test_provider_model_sync_merges_models_visible_to_an_account() -> None:
@@ -618,7 +618,7 @@ def test_model_switch_simulation_preserves_cache_and_tool_charges() -> None:
     assert simulation.estimated_target_cost_usd == 1.30
 
 
-def test_simulation_warns_when_the_target_rate_is_scheduled_to_change() -> None:
+def test_simulation_uses_the_standard_rate_after_an_introductory_rate_expires() -> None:
     events = [UsageEvent("openai", "gpt-5.6-sol", 1_000_000, 100_000, 8.0)]
 
     # Sonnet 5 is on an introductory rate that expires, so a forward-looking
@@ -638,7 +638,7 @@ def test_simulation_warns_when_the_target_rate_is_scheduled_to_change() -> None:
         target_model="claude-haiku-4-5",
     )
 
-    assert "2026-09-01" in expiring.target_rate_warning
+    assert expiring.target_rate_warning == ""
     assert stable.target_rate_warning == ""
 
 

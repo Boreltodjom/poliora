@@ -81,11 +81,11 @@ def connector_catalog() -> list[ConnectorDefinition]:
             "Codex CLI",
             "Local agent capture",
             "ready",
-            "Runs tasks through the documented Codex JSON stream and records token metadata locally.",
+            "Reviews the content-free Codex usage metadata already present on this computer.",
             ("Permission to launch your installed Codex CLI for the task you provide",),
             ("model", "input tokens", "cached tokens", "output tokens", "reasoning tokens"),
-            "Run: poliora codex --model MODEL \"your task\". Poliora ignores prompt, response, command, "
-            "and file-change content when saving usage. Subscription turns are not assigned fake API cost.",
+            "Use Review local history or Refresh local history in the app. Poliora ignores prompts, "
+            "replies, commands, and file changes. Subscription turns are not assigned fake API cost.",
         ),
         ConnectorDefinition(
             "gemini-antigravity",
@@ -95,8 +95,8 @@ def connector_catalog() -> list[ConnectorDefinition]:
             "Tracks exact Gemini API response usage and Antigravity agent activity through supported surfaces.",
             ("Workspace plugin consent", "Application-level Gemini wrapper"),
             ("agent invocations", "model", "tokens", "cache", "reasoning", "tool prompts"),
-            "Run: poliora antigravity-install. Antigravity hooks expose activity but not model or token totals, "
-            "so product-subscription activity stays separate from Gemini API spend.",
+            "Choose Connect Antigravity in the app. Its official hooks expose activity but not model "
+            "or token totals, so product-subscription activity stays separate from Gemini API spend.",
         ),
         ConnectorDefinition(
             "openai-compatible",
@@ -116,7 +116,7 @@ def connector_catalog() -> list[ConnectorDefinition]:
             "Will report product-session usage when a trustworthy official Codex usage export "
             "or plugin surface is available.",
             ("Future official Codex permission",),
-            ("verified usage or quota signals"),
+            ("verified usage or quota signals",),
             "Poliora will not scrape private Codex sessions or make up dollar spend from a ChatGPT subscription.",
         ),
     ]
@@ -162,9 +162,7 @@ class ConnectorStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(f".{self.path.name}.{uuid4().hex}.tmp")
         try:
-            temporary.write_text(
-                json.dumps([item.to_dict() for item in connections], indent=2), encoding="utf-8"
-            )
+            temporary.write_text(json.dumps([item.to_dict() for item in connections], indent=2), encoding="utf-8")
             os.replace(temporary, self.path)
         finally:
             if temporary.exists():

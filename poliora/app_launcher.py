@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -43,6 +44,29 @@ def _desktop_workspace_root() -> Path:
     return data_home / "poliora" / "workspace"
 
 
+def _run_antigravity_hook() -> None:
+    """Receive an Antigravity hook without starting the desktop window."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("antigravity-hook")
+    parser.add_argument("--event", required=True)
+    parser.add_argument("--root", required=True)
+    try:
+        arguments = parser.parse_args()
+        payload = json.load(sys.stdin)
+        if not isinstance(payload, dict):
+            raise ValueError("Hook input must be a JSON object.")
+        from poliora.cost import record_antigravity_hook_event
+
+        record_antigravity_hook_event(
+            payload,
+            event_name=arguments.event,
+            root=Path(arguments.root),
+        )
+    except Exception as error:  # Hooks must never interrupt the user's task.
+        print(f"Poliora hook skipped: {error}", file=sys.stderr)
+    print("{}")
+
+
 def _run_native_window(url: str) -> None:
     """Display the local dashboard inside Poliora's own desktop window."""
     import webview
@@ -60,6 +84,10 @@ def _run_native_window(url: str) -> None:
 
 def main() -> None:
     """Launch Poliora as a local native desktop application."""
+    if len(sys.argv) > 1 and sys.argv[1] == "antigravity-hook":
+        _run_antigravity_hook()
+        return
+
     parser = argparse.ArgumentParser(description="Launch the Poliora local desktop application.")
     parser.add_argument("--version", action="store_true", help="Show the standalone app version and exit.")
     parser.add_argument("--port", type=int, default=8787, help="Preferred local dashboard port.")
@@ -73,13 +101,11 @@ def main() -> None:
 
     existing_port = _running_dashboard_port(arguments.port)
     if existing_port is not None:
-        # Never open a browser from the installed app. The existing Poliora window remains the active application.
         return
 
     workspace_root = _desktop_workspace_root()
     workspace = load_workspace(workspace_root)
-    is_first_launch = not workspace.config_path.exists()
-    if is_first_launch:
+    if not workspace.config_path.exists():
         init_workspace(workspace_root, project="Desktop", monthly_budget_usd=1000.0)
 
     port = _available_port(arguments.port)
@@ -95,9 +121,7 @@ def main() -> None:
 
     server_thread = Thread(target=server.serve_forever, daemon=True, name="poliora-local-engine")
     server_thread.start()
-    # An empty workspace needs the same guided detection whether it is brand-new or migrated from an older app release.
     url = f"http://127.0.0.1:{port}/?desktop-first-run=1"
-
     try:
         _run_native_window(url)
     finally:

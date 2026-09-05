@@ -656,6 +656,7 @@ def antigravity_install_command(
 @app.command("antigravity-hook", hidden=True)
 def antigravity_hook_command(
     event_name: str = typer.Option(..., "--event", help="Antigravity lifecycle event name."),
+    root: Optional[Path] = typer.Option(None, "--root", help="Approved Poliora workspace for the hook."),
 ) -> None:
     """Receive an official Antigravity hook payload on standard input."""
     from poliora.cost import record_antigravity_hook_event
@@ -664,7 +665,7 @@ def antigravity_hook_command(
         payload = json.load(sys.stdin)
         if not isinstance(payload, dict):
             raise ValueError("Hook input must be a JSON object.")
-        record_antigravity_hook_event(payload, event_name=event_name)
+        record_antigravity_hook_event(payload, event_name=event_name, root=root)
     except Exception as error:  # Hooks must not break the user's Antigravity task.
         print(f"Poliora hook skipped: {error}", file=sys.stderr)
     print("{}")

@@ -53,6 +53,12 @@ from poliora.cost.scanner import SystemScanReport, ToolScanResult, scan_system_a
 from poliora.cost.scenarios import SavedScenario, ScenarioStore
 from poliora.cost.sdk import log_anthropic_response, log_gemini_response, log_openai_response, log_usage
 from poliora.cost.simulation import ModelSwitchSimulation, simulate_model_switch
+from poliora.cost.subscriptions import (
+    SubscriptionPlan,
+    SubscriptionStore,
+    new_subscription_plan,
+    summarize_plan_stack,
+)
 from poliora.cost.sync import ModelSyncResult, sync_provider_models
 from poliora.cost.usage import JsonlUsageStore, UsageEvent
 from poliora.cost.workspace import PolioraWorkspace, init_workspace, load_workspace
@@ -89,6 +95,8 @@ __all__ = [
     "ScenarioStore",
     "SpendAnomaly",
     "SystemScanReport",
+    "SubscriptionPlan",
+    "SubscriptionStore",
     "ToolScanResult",
     "UsageEvent",
     "UsageReport",
@@ -122,6 +130,8 @@ __all__ = [
     "simulate_model_switch",
     "sync_provider_models",
     "summarize_decisions",
+    "new_subscription_plan",
+    "summarize_plan_stack",
     "track_anthropic_call",
     "track_anthropic_client",
     "track_gemini_call",

@@ -57,6 +57,11 @@ class PolioraWorkspace:
         return self.workspace_dir / "connectors.json"
 
     @property
+    def subscriptions_path(self) -> Path:
+        """Local AI subscription plan details path."""
+        return self.workspace_dir / "subscriptions.json"
+
+    @property
     def decisions_path(self) -> Path:
         """Savings decision ledger path."""
         return self.workspace_dir / "decisions.json"
@@ -97,6 +102,9 @@ def init_workspace(
     if not workspace.connectors_path.exists():
         workspace.connectors_path.write_text("[]\n", encoding="utf-8")
 
+    if not workspace.subscriptions_path.exists():
+        workspace.subscriptions_path.write_text("[]\n", encoding="utf-8")
+
     if not workspace.decisions_path.exists():
         workspace.decisions_path.write_text("[]\n", encoding="utf-8")
 
@@ -121,8 +129,6 @@ def load_workspace(root: str | Path = ".") -> PolioraWorkspace:
             currency=str(data.get("currency", "USD")),
         )
     except (OSError, ValueError, json.JSONDecodeError):
-        # A local dashboard must stay usable if an interrupted write damages only
-        # its small config file. Usage and pricing data remain untouched.
         return PolioraWorkspace(base)
 
 
