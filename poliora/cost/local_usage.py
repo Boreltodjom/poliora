@@ -146,9 +146,11 @@ def read_claude_code_usage(
     sessions = 0
 
     for path in sorted(root.glob("*/*.jsonl")):
+        if not _touched_since(path, since):
+            continue
         sessions += 1
         trace = _anonymous_trace("claude-code", path)
-        for record in _iter_json_lines(path):
+        for record in _iter_json_lines(path, must_contain=('"usage"', '"plan')):
             plan_type = plan_type or _find_plan_type(record)
             event = _usage_from_claude_record(record, trace_id=trace)
             if event is not None and _within(event, since):
@@ -191,10 +193,12 @@ def read_codex_usage(
     sessions = 0
 
     for path in sorted(_codex_session_files(base)):
+        if not _touched_since(path, since):
+            continue
         sessions += 1
         trace = _anonymous_trace("codex", path)
         model = "unknown"
-        for record in _iter_json_lines(path):
+        for record in _iter_json_lines(path, must_contain=("token_count", '"model"', "rate_limits")):
             model = _find_model(record) or model
             plan = _codex_plan(record) or plan
             event = _usage_from_codex_record(record, model=model, trace_id=trace)
@@ -377,11 +381,34 @@ def _codex_session_files(base: Path) -> Iterator[Path]:
             yield from target.glob("rollout-*.jsonl")
 
 
-def _iter_json_lines(path: Path) -> Iterator[dict[str, Any]]:
+def _touched_since(path: Path, since: datetime | None) -> bool:
+    """Whether a log file could hold events at or after ``since``.
+
+    A session file that has not been written since the cutoff cannot contain
+    an event after it. Skipping those turns a full-history scan into a scan of
+    the few files actually in play, which is the difference between a status
+    line that refreshes instantly and one that hangs the prompt.
+    """
+    if since is None:
+        return True
+    try:
+        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return True
+    return modified >= since
+
+
+def _iter_json_lines(path: Path, *, must_contain: tuple[str, ...] = ()) -> Iterator[dict[str, Any]]:
     """Yield JSON objects from a log, skipping anything unreadable.
 
     Session logs are written by another process and may be mid-write, so a
     truncated final line is normal rather than exceptional.
+
+    ``must_contain`` is a fast path, not a filter for correctness: a line that
+    holds none of the marker substrings cannot hold the field the caller wants,
+    so it is skipped without paying for ``json.loads``. That matters because an
+    active session log runs to tens of megabytes while the interesting records
+    may number in the single digits.
     """
     try:
         handle = path.open("r", encoding="utf-8", errors="replace")
@@ -389,6 +416,8 @@ def _iter_json_lines(path: Path) -> Iterator[dict[str, Any]]:
         return
     with handle:
         for line in handle:
+            if must_contain and not any(marker in line for marker in must_contain):
+                continue
             stripped = line.strip()
             if not stripped:
                 continue

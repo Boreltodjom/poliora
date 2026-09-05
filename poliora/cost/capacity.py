@@ -26,11 +26,14 @@ a ceiling learned here is never applied anywhere else.
 
 from __future__ import annotations
 
+import json
+import os
 import statistics
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
+from uuid import uuid4
 
 from poliora.cost.local_usage import _iter_json_lines, _safe_timestamp
 from poliora.cost.usage import UsageEvent
@@ -179,7 +182,8 @@ def read_throttle_events(*, home: Path | None = None) -> list[ThrottleEvent]:
 
     events: list[ThrottleEvent] = []
     for path in sorted(root.glob("*/*.jsonl")):
-        for record in _iter_json_lines(path):
+        # Three records in 3,271 carry this field; do not parse the rest.
+        for record in _iter_json_lines(path, must_contain=("quotaLimits",)):
             event = _throttle_from_record(record)
             if event is not None:
                 events.append(event)
@@ -285,12 +289,20 @@ def forecast_runway(
     now: datetime | None = None,
     prior_tokens: int | None = None,
     lookback: timedelta = DEFAULT_BURN_LOOKBACK,
+    ceiling: CapacityCeiling | None = None,
 ) -> RunwayForecast:
-    """Project when the current window runs out at the present burn rate."""
+    """Project when the current window runs out at the present burn rate.
+
+    Deriving a ceiling means replaying every session log, which is far too slow
+    for a status bar. A caller that already holds one -- from
+    :func:`load_capacity_cache` -- may pass it in and scan only the recent files
+    that can affect the current window.
+    """
     moment = _as_utc(now)
     length = _window_length(window)
     used = window_consumption(events, window=window, ending_at=moment)
-    ceiling = estimate_ceiling(events, throttles, window=window, prior_tokens=prior_tokens)
+    if ceiling is None:
+        ceiling = estimate_ceiling(events, throttles, window=window, prior_tokens=prior_tokens)
     burn = burn_rate_per_hour(events, now=moment, lookback=lookback)
 
     exhausted_at: datetime | None = None
@@ -346,3 +358,131 @@ def _humanize(span: timedelta) -> str:
         return f"{hours}h {remainder:02d}m" if remainder else f"{hours}h"
     days, leftover_hours = divmod(hours, 24)
     return f"{days}d {leftover_hours}h" if leftover_hours else f"{days}d"
+
+
+@dataclass(frozen=True)
+class CapacityCache:
+    """Ceilings derived from a full history scan, kept for fast reuse.
+
+    A ceiling only moves when a new refusal is recorded, which is rare -- three
+    times in three weeks on the machine this was built against. Recomputing it
+    for every status-bar refresh would replay the entire log history to learn
+    nothing new.
+    """
+
+    ceilings: dict[str, CapacityCeiling]
+    computed_at: datetime
+
+    def age(self, *, now: datetime | None = None) -> timedelta:
+        """How long ago these ceilings were derived."""
+        return _as_utc(now) - self.computed_at
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the cache."""
+        return {
+            "computed_at": self.computed_at.isoformat(),
+            "ceilings": {
+                window: {
+                    "window": ceiling.window,
+                    "tokens": ceiling.tokens,
+                    "basis": ceiling.basis,
+                    "observations": ceiling.observations,
+                }
+                for window, ceiling in self.ceilings.items()
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CapacityCache":
+        """Deserialize a cache, tolerating anything unexpected in the file."""
+        if not isinstance(data, dict):
+            raise ValueError("Capacity cache must be a JSON object.")
+        computed_at = _safe_timestamp(str(data.get("computed_at") or ""))
+        if computed_at is None:
+            raise ValueError("Capacity cache is missing a valid computed_at.")
+        raw = data.get("ceilings")
+        if not isinstance(raw, dict):
+            raise ValueError("Capacity cache ceilings must be an object.")
+        ceilings: dict[str, CapacityCeiling] = {}
+        for window, item in raw.items():
+            if window not in WINDOW_LENGTHS or not isinstance(item, dict):
+                continue
+            tokens = item.get("tokens")
+            ceilings[window] = CapacityCeiling(
+                window=window,
+                tokens=int(tokens) if isinstance(tokens, (int, float)) and not isinstance(tokens, bool) else None,
+                basis=str(item.get("basis", UNKNOWN)),
+                observations=int(item.get("observations", 0) or 0),
+            )
+        return cls(ceilings=ceilings, computed_at=computed_at)
+
+
+def load_capacity_cache(path: str | Path) -> CapacityCache | None:
+    """Read cached ceilings, returning None when absent or unusable.
+
+    A damaged cache must never break the forecast: the worst case is paying for
+    one full scan to rebuild it.
+    """
+    target = Path(path)
+    if not target.exists():
+        return None
+    try:
+        return CapacityCache.from_dict(json.loads(target.read_text(encoding="utf-8")))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def save_capacity_cache(path: str | Path, cache: CapacityCache) -> Path:
+    """Write cached ceilings atomically."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(cache.to_dict(), indent=2), encoding="utf-8")
+        os.replace(temporary, target)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return target
+
+
+# A status bar redraws constantly, and the floor for any Python command is
+# interpreter start-up -- about 0.6s here. Recomputing a forecast on top of that
+# is what makes a status line feel like a hang, so the rendered text is cached
+# and served until it goes stale. Capacity does not move meaningfully inside a
+# minute, so serving a slightly old line costs nothing a user would notice.
+DEFAULT_STATUS_TTL = timedelta(seconds=60)
+
+
+def load_status_line(path: str | Path, *, max_age: timedelta = DEFAULT_STATUS_TTL,
+                     now: datetime | None = None) -> str | None:
+    """Return a cached status line while it is still fresh, else None."""
+    target = Path(path)
+    if not target.exists():
+        return None
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        rendered_at = _safe_timestamp(str(data.get("rendered_at") or ""))
+        text = data.get("text")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if rendered_at is None or not isinstance(text, str) or not text:
+        return None
+    return text if _as_utc(now) - rendered_at < max_age else None
+
+
+def save_status_line(path: str | Path, text: str, *, now: datetime | None = None) -> Path:
+    """Write the rendered status line atomically."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps({"text": text, "rendered_at": _as_utc(now).isoformat()}, indent=2)
+    temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(payload, encoding="utf-8")
+        os.replace(temporary, target)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return target

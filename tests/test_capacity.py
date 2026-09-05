@@ -21,11 +21,17 @@ from poliora.cost.capacity import (
     PRIOR,
     UNKNOWN,
     WEEKLY,
+    CapacityCache,
+    CapacityCeiling,
     ThrottleEvent,
     burn_rate_per_hour,
     estimate_ceiling,
     forecast_runway,
+    load_capacity_cache,
+    load_status_line,
     read_throttle_events,
+    save_capacity_cache,
+    save_status_line,
     window_consumption,
 )
 from poliora.cost.usage import UsageEvent
@@ -382,3 +388,131 @@ def test_throttle_event_serializes(tmp_path: Path) -> None:
     write_session(tmp_path, rejection_record())
     data = read_throttle_events(home=tmp_path)[0].to_dict()
     assert set(data) == {"occurred_at", "window", "resets_at"}
+
+
+# --- ceiling cache ---------------------------------------------------------
+
+
+def a_cache(*, tokens: int | None = 50_000, basis: str = OBSERVED, age_hours: int = 0) -> CapacityCache:
+    return CapacityCache(
+        ceilings={FIVE_HOUR: CapacityCeiling(FIVE_HOUR, tokens, basis, observations=2)},
+        computed_at=NOW - timedelta(hours=age_hours),
+    )
+
+
+def test_cache_round_trips(tmp_path: Path) -> None:
+    path = save_capacity_cache(tmp_path / "capacity.json", a_cache())
+    loaded = load_capacity_cache(path)
+    assert loaded is not None
+    ceiling = loaded.ceilings[FIVE_HOUR]
+    assert ceiling.tokens == 50_000
+    assert ceiling.basis == OBSERVED
+    assert ceiling.observations == 2
+
+
+def test_missing_cache_returns_none(tmp_path: Path) -> None:
+    assert load_capacity_cache(tmp_path / "absent.json") is None
+
+
+@pytest.mark.parametrize("content", ["{ truncated", "[]", '{"ceilings": 5}', '{"computed_at": "nope"}'])
+def test_a_damaged_cache_degrades_to_none(tmp_path: Path, content: str) -> None:
+    # Worst case must be paying for one rebuild, never a crash.
+    target = tmp_path / "capacity.json"
+    target.write_text(content, encoding="utf-8")
+    assert load_capacity_cache(target) is None
+
+
+def test_cache_ignores_unknown_window_names(tmp_path: Path) -> None:
+    target = tmp_path / "capacity.json"
+    target.write_text(
+        json.dumps({"computed_at": NOW.isoformat(), "ceilings": {"fortnightly": {"tokens": 5}}}),
+        encoding="utf-8",
+    )
+    loaded = load_capacity_cache(target)
+    assert loaded is not None and loaded.ceilings == {}
+
+
+def test_cache_reports_its_age() -> None:
+    assert a_cache(age_hours=3).age(now=NOW) == timedelta(hours=3)
+
+
+def test_cache_write_creates_missing_directories(tmp_path: Path) -> None:
+    path = save_capacity_cache(tmp_path / "deep" / "nested" / "capacity.json", a_cache())
+    assert path.exists()
+
+
+def test_cache_write_leaves_no_temporary_file(tmp_path: Path) -> None:
+    save_capacity_cache(tmp_path / "capacity.json", a_cache())
+    assert list(tmp_path.glob(".*tmp")) == []
+
+
+def test_a_supplied_ceiling_skips_derivation() -> None:
+    # The fast path: pass a cached ceiling and no refusals need replaying.
+    supplied = CapacityCeiling(FIVE_HOUR, 40_000, OBSERVED, observations=3)
+    forecast = forecast_runway([usage(minutes_ago=10, tokens=10_000)], [], now=NOW, ceiling=supplied)
+    assert forecast.ceiling is supplied
+    assert forecast.used_pct == 25.0
+
+
+def test_a_supplied_ceiling_wins_over_a_prior() -> None:
+    supplied = CapacityCeiling(FIVE_HOUR, 40_000, OBSERVED, observations=1)
+    forecast = forecast_runway(
+        [usage(tokens=1_000)], [], now=NOW, prior_tokens=999_999, ceiling=supplied
+    )
+    assert forecast.ceiling.tokens == 40_000
+
+
+def test_a_cached_unknown_ceiling_still_refuses_to_guess() -> None:
+    supplied = CapacityCeiling(FIVE_HOUR, None, UNKNOWN)
+    forecast = forecast_runway([usage(tokens=5_000)], [], now=NOW, ceiling=supplied)
+    assert forecast.exhausted_at is None
+    assert "not guessing" in forecast.headline(now=NOW)
+
+
+# --- rendered status line cache --------------------------------------------
+
+
+def test_status_line_round_trips(tmp_path: Path) -> None:
+    path = save_status_line(tmp_path / "statusline.json", "Poliora 12% used", now=NOW)
+    assert load_status_line(path, now=NOW) == "Poliora 12% used"
+
+
+def test_a_fresh_status_line_is_served(tmp_path: Path) -> None:
+    path = save_status_line(tmp_path / "s.json", "fresh", now=NOW)
+    assert load_status_line(path, max_age=timedelta(seconds=60), now=NOW + timedelta(seconds=30)) == "fresh"
+
+
+def test_a_stale_status_line_is_refused(tmp_path: Path) -> None:
+    # Refusing forces a recompute; serving it forever would freeze the gauge.
+    path = save_status_line(tmp_path / "s.json", "old", now=NOW)
+    assert load_status_line(path, max_age=timedelta(seconds=60), now=NOW + timedelta(seconds=90)) is None
+
+
+def test_missing_status_line_returns_none(tmp_path: Path) -> None:
+    assert load_status_line(tmp_path / "absent.json") is None
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "{ truncated",
+        "[]",
+        '{"text": "x"}',
+        '{"rendered_at": "nope", "text": "x"}',
+        '{"text": "", "rendered_at": "2026-09-05T12:00:00Z"}',
+    ],
+)
+def test_a_damaged_status_line_degrades_to_none(tmp_path: Path, content: str) -> None:
+    target = tmp_path / "s.json"
+    target.write_text(content, encoding="utf-8")
+    assert load_status_line(target, now=NOW) is None
+
+
+def test_status_line_write_leaves_no_temporary_file(tmp_path: Path) -> None:
+    save_status_line(tmp_path / "s.json", "text", now=NOW)
+    assert list(tmp_path.glob(".*tmp")) == []
+
+
+def test_status_line_write_creates_missing_directories(tmp_path: Path) -> None:
+    path = save_status_line(tmp_path / "a" / "b" / "s.json", "text", now=NOW)
+    assert path.exists()

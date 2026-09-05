@@ -835,21 +835,61 @@ def runway_command(
     as_json: bool = typer.Option(False, "--json", help="Emit the forecast as JSON."),
 ) -> None:
     """Show how much subscription capacity is left before the next limit."""
-    from poliora.cost.capacity import forecast_runway, read_throttle_events
+    from poliora.cost import load_workspace
+    from poliora.cost.capacity import (
+        WINDOW_LENGTHS,
+        CapacityCache,
+        forecast_runway,
+        load_capacity_cache,
+        load_status_line,
+        read_throttle_events,
+        save_capacity_cache,
+        save_status_line,
+    )
     from poliora.cost.local_usage import read_claude_code_usage, read_codex_usage
 
-    scan = read_claude_code_usage()
-    throttles = read_throttle_events()
+    workspace_dir = load_workspace(".").workspace_dir
+    cache_path = workspace_dir / "capacity.json"
+    status_path = workspace_dir / "statusline.json"
+
+    if statusline:
+        # Serve the cached text before doing any work: this is the difference
+        # between a status bar that redraws instantly and one that stalls.
+        fresh = load_status_line(status_path)
+        if fresh is not None:
+            typer.echo(fresh)
+            return
+
+    cached = load_capacity_cache(cache_path) if statusline else None
+    ceiling = (cached.ceilings.get(window) if cached else None)
+
+    if ceiling is not None:
+        # Fast path: a cached ceiling means only the files that can touch the
+        # current window need reading, which is what makes a status bar viable.
+        since = datetime.now(timezone.utc) - WINDOW_LENGTHS[window]
+        scan = read_claude_code_usage(since=since)
+        throttles = []
+    else:
+        scan = read_claude_code_usage()
+        throttles = read_throttle_events()
+
     forecast = forecast_runway(
-        list(scan.events), throttles, window=window, prior_tokens=plan_tokens
+        list(scan.events), throttles, window=window, prior_tokens=plan_tokens, ceiling=ceiling
     )
+
+    if ceiling is None and forecast.ceiling.is_known:
+        merged = dict(cached.ceilings) if cached else {}
+        merged[window] = forecast.ceiling
+        save_capacity_cache(cache_path, CapacityCache(ceilings=merged, computed_at=datetime.now(timezone.utc)))
 
     if as_json:
         typer.echo(json.dumps(forecast.to_dict(), indent=2))
         return
 
     if statusline:
-        typer.echo(_statusline(forecast, read_codex_usage()))
+        rendered = _statusline(forecast, read_codex_usage())
+        save_status_line(status_path, rendered)
+        typer.echo(rendered)
         return
 
     _banner("Subscription capacity")
