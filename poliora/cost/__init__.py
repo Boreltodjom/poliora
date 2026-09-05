@@ -8,10 +8,12 @@ from poliora.cost.antigravity import (
 from poliora.cost.budget import BudgetCheck, check_budget
 from poliora.cost.capacity import (
     CapacityCeiling,
+    PeakContext,
     RunwayForecast,
     ThrottleEvent,
     estimate_ceiling,
     forecast_runway,
+    peak_context,
     read_throttle_events,
 )
 from poliora.cost.capture import (
@@ -69,12 +71,24 @@ from poliora.cost.subscriptions import (
 )
 from poliora.cost.sync import ModelSyncResult, sync_provider_models
 from poliora.cost.usage import JsonlUsageStore, UsageEvent
+from poliora.cost.workflows import (
+    WorkflowReport,
+    WorkflowUsage,
+    read_workflow_usage,
+    readable_project_name,
+)
 from poliora.cost.workspace import PolioraWorkspace, init_workspace, load_workspace
 
 __all__ = [
     "CapturedCall",
     "AntigravityPluginInstall",
     "CapacityCeiling",
+    "PeakContext",
+    "peak_context",
+    "WorkflowReport",
+    "WorkflowUsage",
+    "read_workflow_usage",
+    "readable_project_name",
     "CatalogModel",
     "RunwayForecast",
     "ThrottleEvent",

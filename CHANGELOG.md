@@ -2,6 +2,46 @@
 
 All notable Poliora changes are documented here.
 
+## 0.4.0 - Capacity, Attribution, and Advice
+
+On a flat plan the scarce resource is capacity, not money. The fee is paid
+whether it is used or not; what varies is how much work fits before the window
+closes. This release answers that question and the two that follow it: what is
+consuming the capacity, and what to do about it.
+
+### Added
+
+- `poliora runway` projects when the current limit window runs out. The ceiling
+  is measured from refusals the tool already recorded -- a refused request is a
+  labelled observation of where the limit sits -- and combined with a median
+  when several exist. With no refusal and no supplied plan limit, it reports
+  consumption and burn rate and refuses to name a wall time.
+- History-relative context, so the first run is useful before any limit has
+  been hit: "this window is heavier than 64% of the last 30 days, and sits at
+  29% of your busiest". A limit is not the only reference point, and a person's
+  own history is available immediately.
+- `poliora workflows` attributes usage to the projects that caused it. Only the
+  project folder name and token counts are read, never file contents or code.
+- `poliora advise` combines all three into what to do today, and says nothing
+  when the measurements do not justify saying something.
+- `poliora statusline --install` wires the capacity line into Claude Code,
+  preserving any status line already configured rather than overwriting it.
+
+### Fixed
+
+- Project names encoded from Windows paths lost hyphens, turning "auto-doc"
+  into "doc". Windows encodes a separator as "--" while POSIX uses a single
+  "-", so the two encodings are now decoded separately.
+- A corrupt capacity cache raised AttributeError instead of degrading, taking
+  down the status line rather than rebuilding.
+
+### Changed
+
+- The status line is 29x faster: 17.71s to 0.61s, of which 0.60s is Python
+  interpreter start-up. Achieved by skipping files untouched within the window,
+  caching derived ceilings, skipping json parsing on lines that cannot hold the
+  wanted field, and caching the rendered line for 60 seconds.
+
 ## 0.3.0 - Daily Companion
 
 ### Added

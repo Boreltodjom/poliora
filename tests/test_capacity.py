@@ -29,6 +29,7 @@ from poliora.cost.capacity import (
     forecast_runway,
     load_capacity_cache,
     load_status_line,
+    peak_context,
     read_throttle_events,
     save_capacity_cache,
     save_status_line,
@@ -516,3 +517,77 @@ def test_status_line_write_leaves_no_temporary_file(tmp_path: Path) -> None:
 def test_status_line_write_creates_missing_directories(tmp_path: Path) -> None:
     path = save_status_line(tmp_path / "a" / "b" / "s.json", "text", now=NOW)
     assert path.exists()
+
+
+# --- history-relative context ----------------------------------------------
+
+
+def busy_history(hours: int, tokens_per_hour: int) -> list[UsageEvent]:
+    """One event per hour going back ``hours``, for percentile comparisons."""
+    return [usage(minutes_ago=60 * h, tokens=tokens_per_hour) for h in range(1, hours + 1)]
+
+
+def test_no_history_is_not_meaningful() -> None:
+    # The first run must say it cannot compare yet, not invent a comparison.
+    context = peak_context([], now=NOW)
+    assert context.is_meaningful is False
+    assert "Not enough history" in context.describe()
+
+
+def test_a_trickle_of_history_is_not_meaningful() -> None:
+    context = peak_context(busy_history(3, 1_000), now=NOW)
+    assert context.is_meaningful is False
+
+
+def test_enough_history_enables_a_comparison() -> None:
+    context = peak_context(busy_history(200, 1_000), now=NOW)
+    assert context.is_meaningful is True
+    assert context.percentile is not None
+
+
+def test_a_quiet_window_ranks_low() -> None:
+    events = busy_history(200, 10_000) + [usage(minutes_ago=1, tokens=1)]
+    context = peak_context(events, now=NOW)
+    assert context.percentile is not None and context.percentile < 50
+
+
+def test_the_busiest_window_is_reported() -> None:
+    events = busy_history(100, 1_000) + [usage(minutes_ago=30, tokens=500_000)]
+    context = peak_context(events, now=NOW)
+    assert context.busiest_tokens >= 500_000
+
+
+def test_a_median_window_is_reported() -> None:
+    context = peak_context(busy_history(200, 4_000), now=NOW)
+    assert context.median_tokens > 0
+
+
+def test_the_description_cites_the_lookback_period() -> None:
+    context = peak_context(busy_history(200, 1_000), now=NOW, lookback_days=14)
+    assert "14 days" in context.describe()
+
+
+def test_context_works_without_any_ceiling() -> None:
+    # The whole point: useful on a machine that has never been refused.
+    context = peak_context(busy_history(200, 5_000), now=NOW)
+    assert context.is_meaningful
+    assert "heavier than" in context.describe()
+
+
+def test_context_serializes() -> None:
+    data = peak_context(busy_history(200, 1_000), now=NOW).to_dict()
+    assert {"window", "current_tokens", "busiest_tokens", "percentile",
+            "samples", "is_meaningful", "description"} <= set(data)
+
+
+def test_weekly_context_uses_the_weekly_window() -> None:
+    events = busy_history(400, 1_000)
+    weekly = peak_context(events, window=WEEKLY, now=NOW)
+    five_hour = peak_context(events, window=FIVE_HOUR, now=NOW)
+    assert weekly.current_tokens > five_hour.current_tokens
+
+
+def test_context_ignores_work_beyond_the_lookback() -> None:
+    ancient = [usage(minutes_ago=60 * 24 * 300, tokens=9_000_000)]
+    context = peak_context(busy_history(200, 1_000) + ancient, now=NOW, lookback_days=30)
+    assert context.busiest_tokens < 9_000_000

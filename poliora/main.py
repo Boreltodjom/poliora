@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -842,6 +843,7 @@ def runway_command(
         forecast_runway,
         load_capacity_cache,
         load_status_line,
+        peak_context,
         read_throttle_events,
         save_capacity_cache,
         save_status_line,
@@ -917,6 +919,11 @@ def runway_command(
     console.print(table)
 
     console.print(f"\n[dim]{forecast.ceiling.describe()}[/dim]")
+    # Without a measured ceiling the user's own history is still a reference
+    # point, and it is available from the first day rather than the first refusal.
+    context = peak_context(list(scan.events), window=window)
+    if context.is_meaningful:
+        console.print(f"[dim]{context.describe()}[/dim]")
     if not forecast.ceiling.is_known:
         console.print(
             "[dim]Pass --plan-tokens to estimate against your published plan limit "
@@ -964,6 +971,172 @@ def _arbitrage_advice(forecast, codex) -> str:
         "Routing mechanical work -- tests, refactors, boilerplate -- to Codex today\n"
         "extends your Claude runway without changing the quality of the hard parts."
     )
+
+
+@app.command("workflows")
+def workflows_command(
+    days: int = typer.Option(30, "--days", min=1, max=365, help="How far back to attribute usage."),
+    limit: int = typer.Option(10, "--limit", min=1, max=50, help="How many projects to list."),
+    as_json: bool = typer.Option(False, "--json", help="Emit the attribution as JSON."),
+) -> None:
+    """Show which projects consumed your local AI capacity."""
+    from poliora.cost.workflows import read_workflow_usage
+
+    report = read_workflow_usage(period_days=days, limit=limit)
+    if as_json:
+        typer.echo(json.dumps(report.to_dict(), indent=2))
+        return
+
+    _banner("Where your AI capacity went")
+    if not report.projects:
+        console.print("[yellow]No project-level usage was found on this computer.[/yellow]")
+        console.print(
+            "[dim]Poliora reads Claude Code's own session logs. "
+            "Use the tool for a day, then try again.[/dim]"
+        )
+        return
+
+    console.print(f"[bold]{report.describe()}[/bold]\n")
+    table = Table(show_header=True)
+    table.add_column("Project", style="cyan")
+    table.add_column("Share", justify="right")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Requests", justify="right")
+    for project in report.projects:
+        table.add_row(
+            project.project,
+            f"{project.share_pct:.1f}%",
+            f"{project.tokens:,}",
+            f"{project.requests:,}",
+        )
+    console.print(table)
+    if report.unattributed_tokens:
+        console.print(f"[dim]{report.unattributed_tokens:,} tokens in projects beyond the top {limit}.[/dim]")
+    console.print(
+        "\n[dim]Only the project folder name and token counts are read. "
+        "Never file contents, code, or prompts.[/dim]"
+    )
+
+
+@app.command("statusline")
+def statusline_command(
+    install: bool = typer.Option(False, "--install", help="Add Poliora to Claude Code's status line."),
+    remove: bool = typer.Option(False, "--remove", help="Remove Poliora from Claude Code's status line."),
+) -> None:
+    """Show, install, or remove the Poliora status line for Claude Code."""
+    settings_path = Path.home() / ".claude" / "settings.json"
+    command = "poliora runway --statusline"
+
+    if install and remove:
+        console.print("[red]Choose either --install or --remove, not both.[/red]")
+        raise typer.Exit(code=1)
+
+    if not install and not remove:
+        _banner("Claude Code status line")
+        console.print("Add this to [cyan]~/.claude/settings.json[/cyan] to see capacity while you work:\n")
+        console.print(json.dumps({"statusLine": {"type": "command", "command": command}}, indent=2))
+        console.print("\n[dim]Or run:[/dim] [bold]poliora statusline --install[/bold]")
+        console.print("[dim]The line is served from a cache refreshed every 60 seconds, "
+                      "so it redraws instantly.[/dim]")
+        return
+
+    # Read-modify-write, preserving every unrelated setting the person has.
+    settings: dict = {}
+    if settings_path.exists():
+        try:
+            loaded = json.loads(settings_path.read_text(encoding="utf-8"))
+            settings = loaded if isinstance(loaded, dict) else {}
+        except (OSError, json.JSONDecodeError) as error:
+            console.print(f"[red]Could not read {settings_path}:[/red] {error}")
+            console.print("[yellow]Fix or move that file, then try again. Nothing was changed.[/yellow]")
+            raise typer.Exit(code=1) from error
+
+    if remove:
+        current = settings.get("statusLine")
+        if not isinstance(current, dict) or command not in str(current.get("command", "")):
+            console.print("[yellow]Poliora is not installed in your Claude Code status line.[/yellow]")
+            return
+        settings.pop("statusLine", None)
+        _write_settings(settings_path, settings)
+        console.print(f"[green]Removed the Poliora status line from[/green] {settings_path}")
+        return
+
+    existing = settings.get("statusLine")
+    if isinstance(existing, dict) and command in str(existing.get("command", "")):
+        console.print("[green]Poliora is already in your Claude Code status line.[/green]")
+        return
+    if isinstance(existing, dict) and existing.get("command"):
+        # Never silently discard someone else's status line.
+        console.print(f"[yellow]Claude Code already has a status line:[/yellow] {existing.get('command')}")
+        console.print("[dim]Remove it first, or combine both commands yourself. Nothing was changed.[/dim]")
+        raise typer.Exit(code=1)
+
+    settings["statusLine"] = {"type": "command", "command": command}
+    _write_settings(settings_path, settings)
+    console.print(f"[green]Installed the Poliora status line in[/green] {settings_path}")
+    console.print("[dim]Restart Claude Code to see it.[/dim]")
+
+
+def _write_settings(path: Path, settings: dict) -> None:
+    """Write settings atomically so an interrupted write cannot truncate them."""
+    from uuid import uuid4
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+@app.command("advise")
+def advise_command(
+    days: int = typer.Option(30, "--days", min=1, max=365, help="History window for attribution."),
+    as_json: bool = typer.Option(False, "--json", help="Emit suggestions as JSON."),
+) -> None:
+    """Say what to do about your AI capacity today."""
+    from poliora.cost.advice import NOW, SOON, build_advice
+    from poliora.cost.capacity import forecast_runway, peak_context, read_throttle_events
+    from poliora.cost.local_usage import read_claude_code_usage, read_codex_usage
+    from poliora.cost.workflows import read_workflow_usage
+
+    scan = read_claude_code_usage()
+    events = list(scan.events)
+    forecast = forecast_runway(events, read_throttle_events())
+    suggestions = build_advice(
+        forecast=forecast,
+        context=peak_context(events),
+        workflows=read_workflow_usage(period_days=days),
+        other_plan=read_codex_usage(),
+    )
+
+    if as_json:
+        typer.echo(json.dumps([item.to_dict() for item in suggestions], indent=2))
+        return
+
+    _banner("What to do about your AI capacity")
+    if not scan.available:
+        console.print("[yellow]No Claude Code session logs were found on this computer.[/yellow]")
+        return
+
+    console.print(f"[bold]{forecast.headline()}[/bold]\n")
+    if not suggestions:
+        console.print("[green]Nothing needs your attention right now.[/green]")
+        console.print("[dim]Poliora only speaks up when the measurements justify it.[/dim]")
+        return
+
+    colours = {NOW: "red", SOON: "yellow"}
+    for item in suggestions:
+        colour = colours.get(item.urgency, "cyan")
+        console.print(
+            Panel(
+                f"{item.because}\n\n[bold]{item.action}[/bold]",
+                title=f"[{colour}]{item.headline}[/{colour}]",
+                border_style=colour,
+            )
+        )
 
 
 @app.command()

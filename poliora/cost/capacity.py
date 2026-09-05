@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import os
 import statistics
+from bisect import bisect_left, bisect_right
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -486,3 +487,133 @@ def save_status_line(path: str | Path, text: str, *, now: datetime | None = None
         if temporary.exists():
             temporary.unlink()
     return target
+
+
+# --- history-relative context ----------------------------------------------
+#
+# A ceiling requires a refusal to measure, and a brand-new install has none.
+# That would leave the most important moment -- the first run -- with nothing
+# to say. But a limit is not the only useful reference point: the user's own
+# history is one, and it is available immediately.
+#
+# "This window is heavier than 9 out of 10 you have run" is honest without
+# knowing the provider's secret threshold, and it is actionable for the same
+# reason a limit would be: it says today is unusual.
+
+
+@dataclass(frozen=True)
+class PeakContext:
+    """Where the current window sits against the user's own recent history."""
+
+    window: str
+    current_tokens: int
+    busiest_tokens: int
+    median_tokens: int
+    percentile: float | None
+    samples: int
+    lookback_days: int
+
+    @property
+    def is_meaningful(self) -> bool:
+        """Whether enough history exists for the comparison to mean anything."""
+        return self.samples >= 24 and self.busiest_tokens > 0
+
+    def describe(self) -> str:
+        """Say where this window sits, or why we cannot say."""
+        if not self.is_meaningful:
+            return (
+                "Not enough history yet to compare this window against your own usage. "
+                "A day or two of normal work is enough."
+            )
+        if self.percentile is None:
+            return "No comparable history for this window."
+        share = self.current_tokens / self.busiest_tokens * 100 if self.busiest_tokens else 0.0
+        return (
+            f"This window is heavier than {self.percentile:.0f}% of the last "
+            f"{self.lookback_days} days, and sits at {share:.0f}% of your busiest."
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize the comparison."""
+        data = asdict(self)
+        data["is_meaningful"] = self.is_meaningful
+        data["description"] = self.describe()
+        return data
+
+
+def _timeline(events: Iterable[UsageEvent]) -> tuple[list[float], list[int]]:
+    """Return event epochs and a prefix-sum of tokens, both sorted by time.
+
+    Sampling hundreds of overlapping windows naively is quadratic. Sorting once
+    and prefix-summing makes each window a pair of binary searches.
+    """
+    stamps: list[tuple[float, int]] = []
+    for event in events:
+        occurred_at = _safe_timestamp(event.timestamp)
+        if occurred_at is not None:
+            stamps.append((occurred_at.timestamp(), event.total_tokens))
+    stamps.sort()
+    epochs = [epoch for epoch, _ in stamps]
+    running = 0
+    prefix = [0]
+    for _, tokens in stamps:
+        running += tokens
+        prefix.append(running)
+    return epochs, prefix
+
+
+def _window_total(epochs: list[float], prefix: list[int], start: float, end: float) -> int:
+    """Tokens recorded in [start, end], via the prefix sum."""
+    left = bisect_left(epochs, start)
+    right = bisect_right(epochs, end)
+    return prefix[right] - prefix[left]
+
+
+def peak_context(
+    events: Sequence[UsageEvent],
+    *,
+    window: str = FIVE_HOUR,
+    now: datetime | None = None,
+    lookback_days: int = 30,
+    step: timedelta = timedelta(hours=1),
+) -> PeakContext:
+    """Compare the current window against every comparable window in history.
+
+    The comparison slides the window across the lookback period, which counts
+    overlapping windows repeatedly. That is deliberate: the question is "how
+    does right now compare to any moment I might have looked", not "how do
+    calendar-aligned buckets compare".
+    """
+    moment = _as_utc(now)
+    length = _window_length(window)
+    epochs, prefix = _timeline(events)
+    current = _window_total(epochs, prefix, (moment - length).timestamp(), moment.timestamp())
+
+    if not epochs:
+        return PeakContext(window, current, 0, 0, None, 0, lookback_days)
+
+    horizon = moment - timedelta(days=lookback_days)
+    earliest = max(horizon, datetime.fromtimestamp(epochs[0], tz=timezone.utc))
+    samples: list[int] = []
+    cursor = earliest + length
+    step_seconds = max(step.total_seconds(), 60)
+    while cursor <= moment:
+        samples.append(
+            _window_total(epochs, prefix, (cursor - length).timestamp(), cursor.timestamp())
+        )
+        cursor += timedelta(seconds=step_seconds)
+
+    active = [value for value in samples if value > 0]
+    if not active:
+        return PeakContext(window, current, 0, 0, None, len(samples), lookback_days)
+
+    below = sum(1 for value in active if value < current)
+    return PeakContext(
+        window=window,
+        current_tokens=current,
+        busiest_tokens=max(active),
+        median_tokens=int(statistics.median(active)),
+        percentile=round(below / len(active) * 100, 1),
+        samples=len(active),
+        lookback_days=lookback_days,
+    )
