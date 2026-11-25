@@ -24,7 +24,7 @@ recommendations for reducing waste.
 
 ## Current Model Coverage
 
-The November 25, 2026 snapshot includes 78 catalog entries across OpenAI,
+The November 25, 2026 snapshot includes 79 catalog entries across OpenAI,
 Anthropic, Google, Meta, DeepSeek, Qwen, xAI, and Mistral. Each new entry links
 to its official source. Supported prices include full-request context tiers
 and the announced December 1 Gemini Carbon/Argon change. Estimates exclude

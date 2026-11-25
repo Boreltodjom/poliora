@@ -1127,7 +1127,8 @@ def _dashboard_page() -> str:
       const cards = available.map(scan => {
         const plan = scan.plan && scan.plan.plan_type ? scan.plan.plan_type : 'plan not recorded';
         const quota = scan.plan && scan.plan.quota_used_pct !== null && scan.plan.quota_used_pct !== undefined ? `<p><strong>Quota:</strong> ${scan.plan.quota_used_pct.toFixed(1)}% used</p>` : '';
-        return `<article class="tool-scan-result detected"><strong>${escapeHtml(scan.display_name)}</strong><span class="scan-state">${scan.requests.toLocaleString()} requests found</span><p><strong>Plan:</strong> ${escapeHtml(plan)}<br><strong>Tokens:</strong> ${scan.total_tokens.toLocaleString()}<br><strong>Equivalent API value:</strong> ${money(scan.equivalent_api_cost_usd)}</p>${quota}</article>`;
+        const missing = (scan.unpriced_models || []).length ? `<p class="panel-note">Partial estimate. Missing rates: ${(scan.unpriced_models || []).map(escapeHtml).join(', ')}</p>` : '';
+        return `<article class="tool-scan-result detected"><strong>${escapeHtml(scan.display_name)}</strong><span class="scan-state">${scan.requests.toLocaleString()} requests found</span><p><strong>Plan:</strong> ${escapeHtml(plan)}<br><strong>Tokens:</strong> ${scan.total_tokens.toLocaleString()}<br><strong>Equivalent API value:</strong> ${money(scan.equivalent_api_cost_usd)}</p>${quota}${missing}</article>`;
       }).join('');
       const action = data.requests && !data.imported_events ? `<p class="panel-note" style="grid-column:1/-1;margin:0"><button id="import-detected-history" type="button">Add ${data.requests.toLocaleString()} metadata-only records to my dashboard</button></p>` : '';
       const imported = data.imported_events ? `<p class="panel-note" style="grid-column:1/-1;margin:0"><strong>${data.imported_events.toLocaleString()} new records added.</strong> Your overview now reflects the local history you approved.</p>` : '';
@@ -1462,18 +1463,9 @@ def _dashboard_page() -> str:
 
 def _usage_identity(event: UsageEvent) -> tuple[object, ...]:
     """Identify a locally detected turn so repeated review never duplicates it."""
-    return (
-        event.provider,
-        event.model,
-        event.input_tokens,
-        event.output_tokens,
-        event.cached_input_tokens,
-        event.reasoning_tokens,
-        event.operation,
-        event.trace_id,
-        event.timestamp,
-        event.metadata.get("source"),
-    )
+    from poliora.cost.usage import usage_identity
+
+    return usage_identity(event)
 
 
 def _catalog_rows(

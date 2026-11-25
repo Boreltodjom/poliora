@@ -59,6 +59,18 @@ def test_plan_stack_requires_usage_before_making_value_claims() -> None:
     assert summary["monthly_equivalent_api_value_usd"] == 0.0
 
 
+def test_missing_rates_block_plan_downgrade_advice() -> None:
+    from dataclasses import replace
+
+    events = [replace(subscription_event(30), metadata={"equivalent_api_rate_known": False}),
+              subscription_event(0, 0.01)]
+    plan = new_subscription_plan({"tool": "codex", "display_name": "Plus", "monthly_cost_usd": 20})
+    summary = summarize_plan_stack([plan], events, build_usage_report(events))
+    assert summary["plans"][0]["status"] == "needs-usage"
+    assert summary["plans"][0]["value_multiple"] is None
+    assert "partial" in summary["notice"].lower()
+
+
 @pytest.mark.parametrize("price", [-1, 100_001])
 def test_subscription_price_is_bounded(price: float) -> None:
     with pytest.raises(ValueError, match="Monthly price"):

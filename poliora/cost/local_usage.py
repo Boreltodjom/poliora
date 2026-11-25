@@ -366,6 +366,7 @@ def _finish(
                     **event.metadata,
                     "billing_basis": SUBSCRIPTION,
                     "equivalent_api_cost_usd": round(value, 6),
+                    "equivalent_api_rate_known": pricing is not None,
                 },
             )
         )

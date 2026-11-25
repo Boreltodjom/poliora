@@ -124,10 +124,13 @@ def summarize_plan_stack(
     """
     observed_values: dict[str, float] = {}
     observed_requests: dict[str, int] = {}
+    missing_rates: dict[str, int] = {}
     for event in events:
         tool = _tool_for_event(event)
         observed_values[tool] = observed_values.get(tool, 0.0) + _equivalent_value(event)
         observed_requests[tool] = observed_requests.get(tool, 0) + 1
+        if event.metadata.get("equivalent_api_rate_known") is False:
+            missing_rates[tool] = missing_rates.get(tool, 0) + 1
 
     rows: list[dict[str, object]] = []
     for plan in plans:
@@ -136,10 +139,14 @@ def summarize_plan_stack(
         monthly_equivalent = round(equivalent / report.observed_days * 30.44, 2) if report.observed_days else 0.0
         ratio = round(monthly_equivalent / plan.monthly_cost_usd, 2) if plan.monthly_cost_usd else None
         status, explanation = _plan_status(plan, requests, monthly_equivalent, report.observed_days)
+        if missing_rates.get(plan.tool):
+            status, ratio = "needs-usage", None
+            explanation = "Some observed models need a rate. This partial comparison cannot support a plan change."
         rows.append(
             {
                 **plan.to_dict(),
                 "requests_observed": requests,
+                "unpriced_requests": missing_rates.get(plan.tool, 0),
                 "equivalent_api_value_usd": equivalent,
                 "monthly_equivalent_api_value_usd": monthly_equivalent,
                 "value_multiple": ratio,
@@ -174,6 +181,7 @@ def summarize_plan_stack(
         "notice": (
             "Equivalent API value uses public API list rates for comparison. It is not provider "
             "billing, invoice data, or an automatic cancellation recommendation."
+            + (" Some requests are unpriced; displayed values are partial." if missing_rates else "")
         ),
     }
 

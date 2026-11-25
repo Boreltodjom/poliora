@@ -71,6 +71,15 @@ class UsageEvent:
         )
 
 
+def usage_identity(event: UsageEvent) -> tuple[object, ...]:
+    """Identify the same detected turn across repeated imports."""
+    return (
+        event.provider, event.model, event.input_tokens, event.output_tokens,
+        event.cached_input_tokens, event.reasoning_tokens, event.operation,
+        event.trace_id, event.timestamp, event.metadata.get("source"),
+    )
+
+
 class JsonlUsageStore:
     """Append-only JSONL store for local usage events."""
 

@@ -796,15 +796,18 @@ def detect_command(
     console.print(
         Panel(
             "These turns were covered by a subscription, so they are recorded at zero spend.\n"
-            f"At published API rates the same work would have cost [bold]${total_value:,.2f}[/bold].\n"
-            "Compare that against what you pay: far below it means a plan worth downgrading,\n"
-            "far above it means the subscription is already earning its keep.",
+            f"The priced portion has an estimated API value of [bold]${total_value:,.2f}[/bold].\n"
+            "This is a public-rate comparison, not your bill. Review missing rates and coverage\n"
+            "before considering a plan change; limits, features and quality also matter.",
             title="What this means",
             border_style="green",
         )
     )
 
     for scan in scans:
+        if scan.unpriced_models:
+            console.print(f"[yellow]{scan.display_name}: partial estimate. Missing rates: "
+                          f"{', '.join(scan.unpriced_models)}[/yellow]")
         if scan.available and scan.plan and scan.plan.quota_used_pct is not None:
             console.print(
                 f"[cyan]{scan.display_name} quota:[/cyan] "
@@ -816,11 +819,17 @@ def detect_command(
         if not workspace.config_path.exists():
             workspace = init_workspace(".", project="detected")
         store = JsonlUsageStore(workspace.usage_path)
+        from poliora.cost.usage import usage_identity
+
+        existing = {usage_identity(event) for event in store.read_all()}
         imported = 0
         for scan in scans:
             for event in scan.events:
-                store.append(event)
-                imported += 1
+                identity = usage_identity(event)
+                if identity not in existing:
+                    store.append(event)
+                    existing.add(identity)
+                    imported += 1
         console.print(f"\n[green]Added {imported:,} events to {workspace.usage_path}.[/green]")
     else:
         console.print("\n[dim]Run with --import to add these to your workspace usage log.[/dim]")

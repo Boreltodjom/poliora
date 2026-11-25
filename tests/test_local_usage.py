@@ -395,3 +395,27 @@ def test_scan_serializes_completely(claude_home: Path) -> None:
     data = read_claude_code_usage(home=claude_home).to_dict()
     assert {"tool", "requests", "sessions", "total_tokens", "equivalent_api_cost_usd",
             "plan", "models", "note"} <= set(data)
+
+
+def test_cli_history_import_is_idempotent(claude_home: Path, tmp_path: Path, monkeypatch) -> None:
+    from poliora.cost import JsonlUsageStore, load_workspace
+    from poliora.main import detect_command
+
+    scans = scan_local_usage(home=claude_home)
+    monkeypatch.setattr("poliora.cost.local_usage.scan_local_usage", lambda **kwargs: scans)
+    workspace_root = tmp_path / "import-test"
+    workspace_root.mkdir()
+    monkeypatch.chdir(workspace_root)
+    detect_command(since_days=None, import_events=True)
+    detect_command(since_days=None, import_events=True)
+    store = JsonlUsageStore(load_workspace(workspace_root).usage_path)
+    assert len(store.read_all()) == len(scans[0].events)
+
+
+def test_unpriced_local_turns_are_explicit(tmp_path: Path) -> None:
+    directory = tmp_path / ".claude" / "projects" / "demo"
+    directory.mkdir(parents=True)
+    (directory / "s.jsonl").write_text(claude_turn(model="unknown-new-model"), encoding="utf-8")
+    scan = read_claude_code_usage(home=tmp_path)
+    assert scan.unpriced_models == ("anthropic/unknown-new-model",)
+    assert scan.events[0].metadata["equivalent_api_rate_known"] is False
