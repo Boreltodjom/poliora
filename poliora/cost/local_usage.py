@@ -190,6 +190,7 @@ def read_codex_usage(
     active_registry = registry or PricingRegistry()
     events: list[UsageEvent] = []
     plan: DetectedPlan | None = None
+    plan_timestamp = ""
     sessions = 0
 
     for path in sorted(_codex_session_files(base)):
@@ -198,9 +199,20 @@ def read_codex_usage(
         sessions += 1
         trace = _anonymous_trace("codex", path)
         model = "unknown"
+        seen_usage: set[str] = set()
         for record in _iter_json_lines(path, must_contain=("token_count", '"model"', "rate_limits")):
             model = _find_model(record) or model
-            plan = _codex_plan(record) or plan
+            candidate = _codex_plan(record)
+            stamp = _timestamp(record)
+            if candidate is not None and stamp >= plan_timestamp:
+                plan, plan_timestamp = candidate, stamp
+            info = record.get("payload", {}).get("info") if isinstance(record.get("payload"), dict) else None
+            cumulative = info.get("total_token_usage") if isinstance(info, dict) else None
+            if isinstance(cumulative, dict):
+                fingerprint = json.dumps(cumulative, sort_keys=True)
+                if fingerprint in seen_usage:
+                    continue
+                seen_usage.add(fingerprint)
             event = _usage_from_codex_record(record, model=model, trace_id=trace)
             if event is not None and _within(event, since):
                 events.append(event)
@@ -378,7 +390,7 @@ def _codex_session_files(base: Path) -> Iterator[Path]:
     for directory in ("sessions", "archived_sessions"):
         target = base / directory
         if target.is_dir():
-            yield from target.glob("rollout-*.jsonl")
+            yield from target.rglob("rollout-*.jsonl")
 
 
 def _touched_since(path: Path, since: datetime | None) -> bool:

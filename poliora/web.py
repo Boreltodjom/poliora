@@ -106,6 +106,11 @@ class _DashboardRequestHandler(BaseHTTPRequestHandler):
         if not self._guard(mutating=False):
             return
         request = urlparse(self.path)
+        if request.path == "/api/health":
+            from poliora import __version__
+
+            self._send_json({"application": "poliora", "version": __version__})
+            return
         if request.path in {"/", "/index.html"}:
             self._send_html(_dashboard_page())
             return
@@ -942,7 +947,7 @@ def _dashboard_page() -> str:
       <section class="view" data-view="models">
         <header class="view-heading"><div><p class="view-kicker">Details when you need them</p><h1>Models &amp; prices</h1><p class="summary">See the AI models in your data, check where prices came from, and add a private contract rate when it differs.</p></div></header>
         <section class="panel"><h2>Observed model spend</h2><p class="panel-note">Models found in the selected reporting period, including token volume and recorded cost.</p><div id="table"></div></section>
-        <section class="panel" style="margin-top:14px"><h2>Model catalog</h2><p class="panel-note">Verified defaults plus models observed in your usage. Models without a verified public price remain visible and can use your contract rate.</p><div class="catalog-toolbar"><label>Find a model<input id="catalog-search" type="search" placeholder="Search model, provider, or capability"></label><label>Provider<select id="catalog-provider"></select></label><span class="catalog-count" id="catalog-count"></span></div><div id="catalog"></div></section>
+        <section class="panel" style="margin-top:14px"><h2>Model catalog</h2><p class="panel-note">New model snapshot reviewed November 25, 2026. Older entries retain their own verification dates. Token estimates exclude tool fees and cache writes; check the source and regional rates before making a spending decision.</p><div class="catalog-toolbar"><label>Find a model<input id="catalog-search" type="search" placeholder="Search model, provider, or capability"></label><label>Provider<select id="catalog-provider"></select></label><span class="catalog-count" id="catalog-count"></span></div><div id="catalog"></div></section>
       </section>
 
       <section class="view" data-view="guide">
@@ -1095,7 +1100,7 @@ def _dashboard_page() -> str:
         const editRate = `<button class="rate-button" type="button" data-edit-rate data-provider="${escapeHtml(item.provider)}" data-model="${escapeHtml(item.model)}">Edit rate</button>`;
         const pricing = item.priced ? money(item.input_per_1m) + ' in / ' + money(item.output_per_1m) + ' out' + cacheRate + '<br>' + editRate : 'Needs rate<br>' + editRate;
         const source = typeof item.source_url === 'string' && item.source_url.startsWith('https://') ? `<a class="source" href="${escapeHtml(item.source_url)}" target="_blank" rel="noreferrer">Source</a>` : 'Local or observed';
-        return `<tr><td>${escapeHtml(item.provider)}</td><td><strong>${escapeHtml(item.display_name)}</strong><br><span class="model-meta">${escapeHtml(item.model)}</span><br>${capabilities}</td><td>${escapeHtml(item.status)}</td><td>${pricing}</td><td>${source}<br><span class="model-meta">${escapeHtml(item.verified_at)}</span></td></tr>`;
+        return `<tr><td>${escapeHtml(item.provider)}</td><td><strong>${escapeHtml(item.display_name)}</strong><br><span class="model-meta">${escapeHtml(item.model)}</span><br>${capabilities}</td><td>${escapeHtml(item.status)}</td><td>${pricing}<br><span class="model-meta">${escapeHtml(item.price_note || item.note || '')}</span></td><td>${source}<br><span class="model-meta">${escapeHtml(item.verified_at)}</span></td></tr>`;
       }).join('')}</tbody></table>`;
     }
     function connectorLabel(connector) {
@@ -1501,6 +1506,8 @@ def _catalog_rows(
         item["output_per_1m"] = pricing.output_per_1m if pricing else None
         item["cached_input_per_1m"] = pricing.cached_input_per_1m if pricing else None
         item["price_note"] = pricing.note if pricing else ""
+        item["pricing_verified_on"] = pricing.verified_on if pricing else None
+        item["long_context_threshold"] = pricing.long_context_threshold if pricing else None
     return sorted(rows.values(), key=lambda item: (str(item["provider"]), str(item["display_name"])))
 
 

@@ -120,12 +120,22 @@ class ModelCatalog:
         raw = json.loads(source.read_text(encoding="utf-8"))
         if not isinstance(raw, list):
             raise ValueError("Model catalog JSON must be a list.")
-        return cls(CatalogModel.from_dict(dict(item)) for item in raw)
+        catalog = cls()
+        for item in raw:
+            model = CatalogModel.from_dict(dict(item))
+            current = catalog.get(model.provider, model.model)
+            if current and model.verified_at < current.verified_at and model.source_url == current.source_url:
+                continue
+            catalog.add(model)
+        return catalog
 
 
 def default_catalog() -> list[CatalogModel]:
     """Return built-in model records verified against official provider docs."""
+    from poliora.cost.current_models import current_catalog
+
     return [
+        *current_catalog(),
         CatalogModel("openai", "gpt-5", "GPT-5", capabilities=("text", "reasoning"), source_url=OPENAI_MODELS_URL),
         CatalogModel("openai", "gpt-5.1", "GPT-5.1", capabilities=("text", "reasoning"), source_url=OPENAI_MODELS_URL),
         CatalogModel("openai", "gpt-5.2", "GPT-5.2", capabilities=("text", "reasoning"), source_url=OPENAI_MODELS_URL),

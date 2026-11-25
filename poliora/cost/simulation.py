@@ -73,10 +73,10 @@ def simulate_model_switch(
     estimated_target_cost = round(
         sum(
             target_pricing.estimate(
-                round(event.input_tokens * ratio),
-                round(event.output_tokens * ratio),
-                cached_input_tokens=round(event.cached_input_tokens * ratio),
-            )
+                event.input_tokens,
+                event.output_tokens,
+                cached_input_tokens=event.cached_input_tokens,
+            ) * ratio
             + event.tool_cost_usd * ratio
             for event in matched
         ),

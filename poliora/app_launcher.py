@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import sys
+from http.client import HTTPConnection, HTTPException
 from pathlib import Path
 from threading import Thread
 
@@ -25,12 +26,19 @@ def _available_port(preferred_port: int) -> int:
 
 
 def _running_dashboard_port(preferred_port: int) -> int | None:
-    """Return an occupied local dashboard port, if Poliora is already open."""
+    """Find a verified Poliora service, ignoring unrelated local applications."""
     for port in range(preferred_port, preferred_port + 20):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-            probe.settimeout(0.2)
-            if probe.connect_ex(("127.0.0.1", port)) == 0:
+        connection = HTTPConnection("127.0.0.1", port, timeout=0.2)
+        try:
+            connection.request("GET", "/api/health")
+            response = connection.getresponse()
+            payload = response.read(4096)
+            if response.status == 200 and json.loads(payload).get("application") == "poliora":
                 return port
+        except (OSError, ValueError, AttributeError, HTTPException):
+            continue
+        finally:
+            connection.close()
     return None
 
 
@@ -101,6 +109,8 @@ def main() -> None:
 
     existing_port = _running_dashboard_port(arguments.port)
     if existing_port is not None:
+        if not arguments.no_open:
+            _run_native_window(f"http://127.0.0.1:{existing_port}/")
         return
 
     workspace_root = _desktop_workspace_root()

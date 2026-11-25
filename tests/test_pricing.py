@@ -346,7 +346,7 @@ def test_every_rate_has_a_recognized_confidence_level() -> None:
 def test_every_verified_rate_records_when_it_was_checked() -> None:
     for pricing in default_pricing():
         if pricing.confidence == VERIFIED:
-            assert pricing.verified_on == PRICING_VERIFIED_ON, pricing.key
+            assert pricing.verified_on and pricing.verified_on >= PRICING_VERIFIED_ON, pricing.key
 
 
 def test_every_paid_rate_cites_a_source() -> None:

@@ -21,7 +21,7 @@ from poliora.cost.workflows import (
     readable_project_name,
 )
 
-NOW = datetime(2026, 9, 5, 12, 0, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
 
 
 def turn(*, tokens: int = 1_000, days_ago: int = 0) -> str:

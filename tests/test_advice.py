@@ -23,7 +23,7 @@ from poliora.cost.capacity import (
 from poliora.cost.local_usage import DetectedPlan, LocalUsageScan
 from poliora.cost.workflows import WorkflowReport, WorkflowUsage
 
-CLOCK = datetime(2026, 9, 5, 12, 0, tzinfo=timezone.utc)
+CLOCK = datetime.now(timezone.utc)
 
 
 def forecast(

@@ -7,6 +7,27 @@ without collecting prompts, code, or provider credentials.
 
 ## Setup
 
+For tomorrow's individual testers, use the desktop app from the new GitHub
+release. Pick Windows, macOS Apple Silicon, or macOS Intel to match the laptop.
+The desktop downloads include their own runtime; users do not need Python.
+Open Poliora from the desktop shortcut or Applications after installation.
+
+In the app:
+
+1. Choose the local-history option, review the permission explanation, and scan.
+2. Review the Codex and Claude Code results before approving the import.
+3. Add the monthly price of each subscription under Add a tool or a bill.
+4. Return to My AI activity and check the plan comparison and model mix.
+5. Refresh local history a second time. Existing records should not be added twice.
+6. Export a report and review it locally.
+
+For subscription users, equivalent API value is a comparison at public token
+rates, not an invoice or a promise of cash savings. Quota forecasts are estimates
+based on available local evidence. Other tools may require a supported export
+or helper; catalog support alone does not mean automatic history access.
+
+The command-line alternative for developers with Python is:
+
 ```bash
 python -m pip install poliora
 mkdir poliora-pilot

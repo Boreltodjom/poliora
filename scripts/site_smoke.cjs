@@ -23,7 +23,7 @@ async function inspect(browser, name, viewport) {
   page.on("pageerror", (error) => errors.push(error.message));
   const response = await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
   if (!response || !response.ok()) throw new Error(`${name}: site returned ${response?.status()}`);
-  if ((await page.locator('link[rel="canonical"]').getAttribute("href")) !== "https://poliora.pages.dev/") {
+  if ((await page.locator('link[rel="canonical"]').getAttribute("href")) !== "https://poliora.com/") {
     throw new Error(`${name}: canonical URL is missing or incorrect`);
   }
   const description = await page.locator('meta[name="description"]').getAttribute("content");
@@ -35,15 +35,15 @@ async function inspect(browser, name, viewport) {
   if (!(await page.locator("#calculator").isVisible())) throw new Error(`${name}: calculator missing`);
   if (!(await page.locator("#strategy").isVisible())) throw new Error(`${name}: decision path missing`);
   if (!(await page.locator("#download").isVisible())) throw new Error(`${name}: install section missing`);
-  const windowsDownload = await page.locator('#download a').first().getAttribute('href');
-  const macDownload = await page.locator('#download a').nth(1).getAttribute('href');
+  const windowsDownload = await page.getByRole('link', { name: 'Download for Windows', exact: true }).getAttribute('href');
+  const macDownload = await page.getByRole('link', { name: 'Download for macOS (Apple Silicon)', exact: true }).getAttribute('href');
   if (windowsDownload !== "https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-Setup-Windows.exe") {
     throw new Error(`${name}: Windows desktop installer link is incorrect`);
   }
-  if (macDownload !== "https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS.zip") {
+  if (macDownload !== "https://github.com/Boreltodjom/poliora/releases/latest/download/Poliora-macOS-AppleSilicon.zip") {
     throw new Error(`${name}: macOS desktop download link is incorrect`);
   }
-  if ((await page.locator('.cli-cmd').textContent()).trim() !== 'poliora detect') {
+  if ((await page.locator('.cli-cmd').textContent()).trim() !== 'pip install poliora && poliora detect') {
     throw new Error(`${name}: first-run detection command is missing`);
   }
 

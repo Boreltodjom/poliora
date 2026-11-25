@@ -70,6 +70,10 @@ class ModelPricing:
     verified_on: str | None = None
     source_url: str = ""
     confidence: str = CARRIED_FORWARD
+    long_context_threshold: int | None = None
+    long_input_per_1m: float | None = None
+    long_output_per_1m: float | None = None
+    long_cached_input_per_1m: float | None = None
 
     @property
     def key(self) -> str:
@@ -86,6 +90,15 @@ class ModelPricing:
 
     def estimate(self, input_tokens: int, output_tokens: int, *, cached_input_tokens: int = 0) -> float:
         """Estimate request cost in USD, accounting for cached input when known."""
+        if self.long_context_threshold is not None and input_tokens > self.long_context_threshold:
+            from dataclasses import replace
+
+            return replace(
+                self, long_context_threshold=None,
+                input_per_1m=self.long_input_per_1m or self.input_per_1m,
+                output_per_1m=self.long_output_per_1m or self.output_per_1m,
+                cached_input_per_1m=self.long_cached_input_per_1m,
+            ).estimate(input_tokens, output_tokens, cached_input_tokens=cached_input_tokens)
         cached_tokens = min(max(cached_input_tokens, 0), max(input_tokens, 0))
         regular_input_tokens = max(input_tokens, 0) - cached_tokens
         cached_rate = self.cached_input_per_1m if self.cached_input_per_1m is not None else self.input_per_1m
@@ -225,6 +238,15 @@ class PricingRegistry:
         raw = json.loads(source.read_text(encoding="utf-8"))
         registry = cls()
         for item in raw:
+            current = registry.get(str(item["provider"]), str(item["model"]))
+            # An older saved public snapshot must not replace newer public rates.
+            if (current and item.get("source_url") == current.source_url
+                    and item.get("verified_on") and current.verified_on
+                    and str(item["verified_on"]) < current.verified_on
+                    and item.get("confidence") in {VERIFIED, CARRIED_FORWARD}
+                    and not any(word in str(item.get("note", "")).lower()
+                                for word in ("contract", "custom", "override"))):
+                continue
             registry.add(
                 ModelPricing(
                     provider=str(item["provider"]),
@@ -240,6 +262,10 @@ class PricingRegistry:
                     verified_on=_optional_text(item.get("verified_on")),
                     source_url=str(item.get("source_url", "")),
                     confidence=str(item.get("confidence", CARRIED_FORWARD)),
+                    long_context_threshold=item.get("long_context_threshold"),
+                    long_input_per_1m=item.get("long_input_per_1m"),
+                    long_output_per_1m=item.get("long_output_per_1m"),
+                    long_cached_input_per_1m=item.get("long_cached_input_per_1m"),
                 )
             )
         return registry
@@ -338,6 +364,8 @@ def default_pricing() -> list[ModelPricing]:
     ``CARRIED_FORWARD`` predates this audit and could not be re-confirmed —
     treat those as estimates until someone checks them against the provider.
     """
+    from poliora.cost.current_models import current_pricing
+
     return [
         *_anthropic_pricing(),
         *_openai_pricing(),
@@ -345,6 +373,7 @@ def default_pricing() -> list[ModelPricing]:
         *_xai_pricing(),
         *_deepseek_pricing(),
         *_other_pricing(),
+        *current_pricing(),
     ]
 
 

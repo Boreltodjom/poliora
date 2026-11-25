@@ -22,6 +22,23 @@ recommendations for reducing waste.
   and measured rollout, keeping projected and realized savings separate.
 - Keeps the existing LoRA, quantization, carbon tracking, and training benchmark tools.
 
+## Current Model Coverage
+
+The November 25, 2026 snapshot includes 78 catalog entries across OpenAI,
+Anthropic, Google, Meta, DeepSeek, Qwen, xAI, and Mistral. Each new entry links
+to its official source. Supported prices include full-request context tiers
+and the announced December 1 Gemini Carbon/Argon change. Estimates exclude
+cache-write and tool charges unless recorded separately; check the rate note
+for regional pricing and peak-rate estimates.
+
+Catalog coverage is separate from local history support. Codex and Claude Code
+have local metadata readers; adding a model does not grant access to another
+application's usage history. Account model discovery supports Meta and DeepSeek
+in addition to the existing providers. It uses an explicitly supplied key for
+that request and does not store it. Discovery updates availability, not prices.
+Public prices are versioned snapshots, so new releases still require a source
+review. Private contract overrides remain local.
+
 ## See Your Existing AI Usage First
 
 Poliora's fastest first result is local history detection. It reads only the metadata Codex and Claude Code already keep in their own local session logs: timestamps, model names, token totals, plan type, and quota where available. It does not read prompts, replies, source code, commands, credentials, or chat transcripts.

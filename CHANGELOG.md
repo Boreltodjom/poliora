@@ -2,6 +2,16 @@
 
 All notable Poliora changes are documented here.
 
+## 0.5.1 - 2026-11-25
+
+- Add a sourced November model snapshot: GPT-6.2, Claude 5.5/Fable 5.2, Gemini 4, Meta Muse, Qwen 4 and current DeepSeek/Grok identifiers.
+- Apply full-request long-context pricing for supported new model tiers.
+- Schedule Gemini Carbon/Argon December 1 pricing without repricing November usage.
+- Preserve private contract overrides while replacing older saved public snapshots.
+- Discover account-available Meta and DeepSeek models through authorized APIs.
+- Display pricing scope and exclusions beside model rates.
+- Repair date-sensitive test fixtures and expand migration/pricing regression coverage.
+
 ## 0.5.0 - Background Warnings
 
 ### Added

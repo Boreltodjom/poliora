@@ -2,6 +2,8 @@ name: Publish Poliora release
 
 on:
   push:
+    branches:
+      - "codex/pilot-readiness-*"
     tags:
       - "v*"
 
@@ -41,6 +43,7 @@ jobs:
         run: |
           python -m pip install . pyinstaller
           pyinstaller --noconfirm --clean Poliora-Engine-Win.spec
+          python scripts/smoke_desktop.py dist/Poliora.exe
           choco install innosetup --no-progress -y
           $version = python -c "from poliora import __version__; print(__version__)"
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "installer\Poliora.iss"
@@ -50,7 +53,15 @@ jobs:
           path: artifacts/Poliora-Setup-Windows.exe
 
   macos-desktop:
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            architecture: Intel
+          - runner: macos-15
+            architecture: AppleSilicon
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -73,13 +84,19 @@ jobs:
           iconutil -c icns build/poliora.iconset -o build/poliora.icns
           pyinstaller --noconfirm --clean --windowed --name Poliora --icon build/poliora.icns --hidden-import webview.platforms.cocoa --collect-data webview poliora/app_launcher.py
           mkdir -p artifacts
-          ditto -c -k --sequesterRsrc --keepParent dist/Poliora.app artifacts/Poliora-macOS.zip
+          dist/Poliora.app/Contents/MacOS/Poliora --version
+          python scripts/smoke_desktop.py dist/Poliora.app/Contents/MacOS/Poliora
+          ditto -c -k --sequesterRsrc --keepParent dist/Poliora.app artifacts/Poliora-macOS-${{ matrix.architecture }}.zip
+          if [ "${{ matrix.architecture }}" = "Intel" ]; then
+            cp artifacts/Poliora-macOS-Intel.zip artifacts/Poliora-macOS.zip
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-desktop
-          path: artifacts/Poliora-macOS.zip
+          name: macos-desktop-${{ matrix.architecture }}
+          path: artifacts/Poliora-macOS*.zip
 
   release:
+    if: startsWith(github.ref, 'refs/tags/')
     needs: [verify, windows-desktop, macos-desktop]
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +104,9 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+      - name: Generate download checksums
+        working-directory: release-assets
+        run: sha256sum -- *.exe *.zip *.whl *.tar.gz > SHA256SUMS.txt
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
         with:
@@ -94,6 +114,7 @@ jobs:
           files: release-assets/*
 
   publish-pypi:
+    if: startsWith(github.ref, 'refs/tags/')
     needs: verify
     runs-on: ubuntu-latest
     environment: pypi

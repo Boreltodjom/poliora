@@ -336,6 +336,34 @@ def test_codex_reads_both_live_and_archived_sessions(tmp_path: Path) -> None:
     assert read_codex_usage(home=tmp_path).sessions == 2
 
 
+def test_codex_reads_dated_session_directories(tmp_path: Path) -> None:
+    directory = tmp_path / ".codex" / "sessions" / "2026" / "11" / "25"
+    directory.mkdir(parents=True)
+    (directory / "rollout-nested.jsonl").write_text(codex_turn(), encoding="utf-8")
+    scan = read_codex_usage(home=tmp_path)
+    assert scan.sessions == 1
+    assert len(scan.events) == 1
+
+
+def test_repeated_codex_total_does_not_count_the_last_turn_twice(tmp_path: Path) -> None:
+    directory = tmp_path / ".codex" / "sessions"
+    directory.mkdir(parents=True)
+    (directory / "rollout-repeat.jsonl").write_text(
+        codex_turn(used_percent=10) + "\n" + codex_turn(used_percent=20), encoding="utf-8"
+    )
+    scan = read_codex_usage(home=tmp_path)
+    assert len(scan.events) == 1
+    assert scan.plan.quota_used_pct == 20
+
+
+def test_codex_uses_latest_quota_not_last_sorted_filename(tmp_path: Path) -> None:
+    directory = tmp_path / ".codex" / "sessions"
+    directory.mkdir(parents=True)
+    (directory / "rollout-a.jsonl").write_text(codex_turn(used_percent=80), encoding="utf-8")
+    (directory / "rollout-z.jsonl").write_text(codex_turn(used_percent=5, days_ago=5), encoding="utf-8")
+    assert read_codex_usage(home=tmp_path).plan.quota_used_pct == 80
+
+
 # --- time filtering --------------------------------------------------------
 
 

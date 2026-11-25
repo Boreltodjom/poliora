@@ -103,18 +103,23 @@ def _provider_request(provider: str, api_key: str) -> dict[str, object]:
             "headers": {"Authorization": f"Bearer {api_key}"},
             "params": {},
         }
-    supported = "openai, anthropic, google, mistral, xai"
+    if provider in {"meta", "deepseek"}:
+        base = "https://api.meta.ai/v1" if provider == "meta" else "https://api.deepseek.com"
+        return {"url": base + "/models", "headers": {"Authorization": f"Bearer {api_key}"}, "params": {}}
+    supported = "openai, anthropic, google, mistral, xai, meta, deepseek"
     raise ValueError(f"Unsupported provider '{provider}'. Supported providers: {supported}.")
 
 
 def _parse_provider_payload(provider: str, payload: dict[str, Any]) -> list[CatalogModel]:
     verified_at = datetime.now(timezone.utc).date().isoformat()
-    if provider in {"openai", "anthropic", "mistral"}:
+    if provider in {"openai", "anthropic", "mistral", "meta", "deepseek"}:
         items = payload.get("data", [])
         source_urls = {
             "openai": OPENAI_MODELS_URL,
             "anthropic": ANTHROPIC_MODELS_URL,
             "mistral": MISTRAL_MODELS_URL,
+            "meta": "https://dev.meta.ai/docs/models",
+            "deepseek": "https://api-docs.deepseek.com/api/list-models/",
         }
         source_url = source_urls[provider]
         return [_catalog_model(provider, item, source_url, verified_at) for item in items if item.get("id")]
