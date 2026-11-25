@@ -12,10 +12,17 @@ const chromeCandidates = [
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
 ];
-const executablePath = chromeCandidates.find((candidate) => fs.existsSync(candidate));
+const executablePath = process.env.POLIORA_BROWSER_EXECUTABLE || chromeCandidates.find((candidate) => fs.existsSync(candidate));
 
 async function inspectViewport(browser, name, viewport) {
-  const page = await browser.newPage({ viewport });
+  const page = await browser.newPage({ viewport, reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const style = document.createElement("style");
+      style.textContent = "*,*::before,*::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }";
+      document.head.appendChild(style);
+    });
+  });
   const errors = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(`console: ${message.text()}`);
@@ -120,7 +127,7 @@ async function inspectViewport(browser, name, viewport) {
 async function main() {
   if (!executablePath) throw new Error("Chrome or Edge is required for the UI smoke test.");
   fs.mkdirSync(outputDirectory, { recursive: true });
-  const browser = await chromium.launch({ headless: true, executablePath });
+  const browser = await chromium.launch({ headless: true, executablePath, args: ["--disable-gpu"] });
   try {
     const results = [];
     results.push(await inspectViewport(browser, "desktop", { width: 1440, height: 1000 }));
