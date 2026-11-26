@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feedback &amp; support | Poliora</title>
+  <meta name="description" content="Get help with Poliora, report a bug or request an integration. Prepare and review a feedback email without a Poliora account. No workspace data is attached.">
+  <link rel="canonical" href="https://poliora.com/support.html"><meta name="robots" content="index,follow">
+  <link rel="icon" href="assets/poliora-mark.png"><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><div class="header-inner"><a href="index.html" class="brand-logo" aria-label="Poliora home"><img src="assets/poliora-mark.png" width="36" height="36" alt=""><span class="brand-text">Poliora</span></a><nav class="primary-nav" aria-label="Main navigation"><a href="index.html#detection">Product</a><a href="index.html#download">Downloads</a><a href="index.html#faq">FAQ</a><a href="support.html" aria-current="page">Support</a></nav><a href="index.html#download" class="button primary header-download">Get Poliora free</a></div></header>
+  <div class="site-layout">
+    <aside class="section-nav" aria-label="Help navigation"><p class="nav-caption">HELP &amp; RESOURCES</p><a href="support.html" class="current" aria-current="page">Feedback &amp; support</a><a href="index.html#faq">Questions &amp; answers</a><a href="index.html#compatibility">Supported tools</a><a href="index.html#download">Downloads</a><div class="nav-divider"></div><a href="privacy.html">Privacy &amp; data</a><a href="https://github.com/Boreltodjom/poliora/issues" target="_blank" rel="noopener">Public issue tracker</a><p class="sidebar-note">No Poliora account needed.<br>You choose what to send.</p></aside>
+    <main id="main">
+      <div class="page-trail">Help center <span>/</span> Feedback &amp; support</div>
+      <header class="page-intro"><p class="eyebrow">We are listening</p><h1>What can we help you with?</h1><p>Report something that did not work, tell us what felt confusing, or ask for a missing integration. Review your message before sharing anything.</p></header>
+      <div class="help-layout">
+        <div>
+          <div class="notice"><strong>No automatic upload.</strong> This form prepares a draft on your device. It does not send a message, attach logs, or collect your workspace data. You send it through your email app or GitHub.</div>
+          <noscript><p class="notice">JavaScript is needed to prepare a draft here. You can still use the <a href="https://github.com/Boreltodjom/poliora/issues">public GitHub issue tracker</a>. Do not include confidential information.</p></noscript>
+          <form id="feedback-form" action="#draft-preview" method="dialog" data-email-ready="false">
+            <label class="form-field" for="feedback-type">What is this about?<select id="feedback-type" name="type"><option value="bug">Bug report</option><option value="installation">Installation help</option><option value="integration">Integration request</option><option value="idea">Feature idea</option><option value="question">Question</option><option value="experience">My experience</option></select></label>
+            <label class="form-field" for="feedback-subject">A short summary<input id="feedback-subject" name="subject" required minlength="3" maxlength="120" placeholder="For example: my Claude Code history is not showing" autocomplete="off"></label>
+            <div class="field-pair"><label class="form-field" for="feedback-os">Operating system (optional)<select id="feedback-os" name="os"><option value="">Choose if relevant</option><option>Windows</option><option>macOS (Apple Silicon)</option><option>macOS (Intel)</option><option>Linux / CLI</option><option>Other</option></select></label><label class="form-field" for="feedback-version">Poliora version (optional)<input id="feedback-version" name="version" maxlength="40" placeholder="For example: 0.5.1" autocomplete="off"></label></div>
+            <label class="form-field" for="feedback-message">What happened, and what did you expect?<textarea id="feedback-message" name="message" required minlength="10" maxlength="1800" placeholder="Include the steps we can repeat. Please leave out API keys, prompts, private code and customer information."></textarea></label>
+            <p class="small muted">No fields are saved by this site. For a security vulnerability, use the private reporting guidance beside this form instead.</p>
+            <div class="action-row"><button class="button primary" type="submit">Preview feedback</button></div>
+          </form>
+          <section id="draft-preview" class="draft-preview" tabindex="-1" hidden aria-labelledby="draft-heading"><h2 id="draft-heading">Review your draft</h2><p class="small muted">Check the contents before sharing. A GitHub issue is public; an email is sent to the support inbox.</p><pre id="draft-text"></pre><p id="email-pending" class="notice">The support@poliora.com inbox is being activated. For now, use the GitHub option for non-sensitive feedback. You can still copy your draft.</p><div class="action-row"><a id="email-draft" class="button primary" hidden>Open email draft</a><button id="copy-draft" class="button" type="button">Copy draft</button><a id="github-draft" class="button" target="_blank" rel="noopener noreferrer">Prepare public GitHub issue</a></div><p class="small muted">GitHub requires its own account. Neither option sends anything until you submit it in that service.</p><p id="draft-status" class="draft-status" role="status" aria-live="polite"></p></section>
+        </div>
+        <aside class="help-aside" aria-label="Support guidance"><section><h2>Before reporting a bug</h2><ul><li>Check the current release notes.</li><li>Tell us your app version and operating system if you know them.</li><li>Describe the steps, expected result and actual result.</li><li>Review screenshots for private information.</li></ul><a href="https://github.com/Boreltodjom/poliora/releases/latest" target="_blank" rel="noopener">Latest release notes</a></section><section><h2>Keep private things private.</h2><p>Never share API keys, passwords, prompts, private source code or unredacted customer data in a public issue.</p><p class="inline-note">For security reports, use <a href="https://github.com/Boreltodjom/poliora/security/policy" target="_blank" rel="noopener">our security reporting guidance</a>. Do not submit exploit details through a public issue.</p></section><section><h2>Not sure where to start?</h2><p>The FAQ explains local history, subscriptions, API value and supported tools.</p><a href="index.html#faq">Read the FAQ</a></section></aside>
+      </div>
+      <footer class="site-footer"><span>&copy; 2026 Poliora</span><nav aria-label="Footer"><a href="index.html">Product</a><a href="privacy.html">Privacy &amp; data</a><a href="https://github.com/Boreltodjom/poliora/issues">GitHub issues</a></nav></footer>
+    </main>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>

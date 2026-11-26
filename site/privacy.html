@@ -1,39 +1,25 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="assets/logo.png">
-  <meta name="description" content="Poliora's local-first privacy boundary for AI cost control.">
-  <link rel="canonical" href="https://poliora.com/privacy.html">
-  <meta name="robots" content="index,follow">
-  <title>Privacy boundary | Poliora</title>
-  <style>
-    body { margin: 0; background: #f6f3ed; color: #16201d; font-family: Inter, system-ui, sans-serif; }
-    main { width: min(780px, calc(100% - 40px)); margin: 0 auto; padding: 62px 0 88px; }
-    a { color: #237a58; }
-    h1 { margin: 26px 0 12px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(42px, 6vw, 64px); font-weight: 500; line-height: 1; }
-    h2 { margin-top: 40px; font-size: 20px; }
-    p, li { color: #536159; font-size: 15px; line-height: 1.7; }
-    .mark { display: grid; width: 34px; height: 34px; place-items: center; background: #18372d; color: #a9e8c8; font-size: 11px; font-weight: 900; text-decoration: none; }
-    .notice { margin: 30px 0; padding: 20px 22px; border-left: 4px solid #ef8063; background: #fffdf9; }
-  </style>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy &amp; data | Poliora</title><meta name="description" content="How Poliora separates local AI usage, public website analytics and voluntary feedback. No Poliora account or automatic desktop telemetry upload.">
+  <link rel="canonical" href="https://poliora.com/privacy.html"><meta name="robots" content="index,follow"><link rel="icon" href="assets/poliora-mark.png"><link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
-    <a class="mark" href="index.html" aria-label="Back to Poliora">P</a>
-    <h1>Privacy boundary</h1>
-    <p>Poliora 0.2.1 is a local application. This page describes the launch product, not a future hosted service.</p>
-    <div class="notice"><strong>The default path is local.</strong><p>The dashboard binds to <code>127.0.0.1</code>, and workspace data is stored in the current project's <code>.poliora</code> directory.</p></div>
-    <h2>Collected locally</h2>
-    <p>Poliora may store provider, model, token totals, supplied or estimated cost, workflow, customer label, timestamps, request status, and trace identifiers when the user chooses an integration.</p>
-    <h2>Not required</h2>
-    <p>Prompts, model replies, source code, and private transcripts are not required for cost accounting and are not collected by default.</p>
-    <h2>Provider credentials</h2>
-    <p>Keys used by provider SDKs or model discovery remain in the user's environment. They should never be placed in source code, a report, or a Poliora workspace file.</p>
-    <h2>Public website</h2>
-    <p>The launch website is static and does not receive local dashboard data. If Cloudflare Web Analytics is enabled, it measures anonymous website visits and performance; it does not receive Poliora workspace data, prompts, source code, or provider credentials.</p>
-    <p><a href="index.html">Return to Poliora</a></p>
-  </main>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><div class="header-inner"><a href="index.html" class="brand-logo" aria-label="Poliora home"><img src="assets/poliora-mark.png" width="36" height="36" alt=""><span class="brand-text">Poliora</span></a><nav class="primary-nav" aria-label="Main navigation"><a href="index.html#detection">Product</a><a href="index.html#download">Downloads</a><a href="index.html#faq">FAQ</a><a href="support.html">Support</a></nav><a href="index.html#download" class="button primary header-download">Get Poliora free</a></div></header>
+  <div class="site-layout"><aside class="section-nav" aria-label="Help navigation"><p class="nav-caption">HELP &amp; RESOURCES</p><a href="support.html">Feedback &amp; support</a><a href="index.html#faq">Questions &amp; answers</a><a href="privacy.html" class="current" aria-current="page">Privacy &amp; data</a><a href="https://github.com/Boreltodjom/poliora/security/policy">Security policy</a><div class="nav-divider"></div><a href="index.html">Back to Poliora</a></aside>
+    <main id="main"><div class="page-trail">Help center <span>/</span> Privacy &amp; data</div><header class="page-intro"><p class="eyebrow">Privacy boundary</p><h1>Your workspace is not our analytics.</h1><p>Updated November 26, 2026. This notice distinguishes the local desktop app, the public website and information you voluntarily share with support.</p></header>
+      <article class="prose">
+        <h2>The desktop app</h2><p>Poliora runs its dashboard on your computer, bound to <code>127.0.0.1</code>. Workspace files are stored in a local <code>.poliora</code> directory. The desktop installer uses the operating system's per-user application-data location; the CLI uses the workspace you select.</p><p>No Poliora account is required. The app has no automatic upload of product usage, local logs or workspace data to a Poliora analytics service. We cannot see who installed or used the app from a website visit alone.</p>
+        <h2>Usage metadata you approve</h2><p>Supported sources may provide provider and model identifiers, timestamps, token totals, recorded costs, plan or quota information, request status and labels. Local history scanning previews supported Codex and Claude Code usage fields before you approve an import. A launcher availability check is a separate operation and is not evidence of spend.</p><p>Cost analysis does not require prompts, model replies, source code, private chats or credentials. Do not put sensitive content into project, customer or workflow labels. Quota fields may be missing or out of date, and equivalent API value is an estimate, not an invoice.</p>
+        <h2>Network activity</h2><p>Optional provider-backed actions, such as model discovery, contact the provider you choose. API wrappers still contact the provider used by your application. Download links contact GitHub, and the optional Python installation uses PyPI. These services have their own policies.</p><p>Provider credentials remain in your local configuration or environment; they are not required for reviewing supported local history and should never be included in feedback.</p>
+        <h2>The public website</h2><p>Cloudflare hosts this website and processes requests needed to deliver and secure it. Cloudflare Web Analytics, when enabled, measures aggregate website visits and performance, with dimensions such as page, referrer, device and country. It is separate from the desktop app and does not receive your Poliora workspace, token history, prompts or provider keys.</p><p>We do not add advertising pixels, session replay or cross-site tracking to this website. The support form does not save drafts to browser storage, and form contents are not sent to an analytics endpoint. <a href="https://developers.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Read about Cloudflare Web Analytics</a>.</p>
+        <h2>Feedback is a deliberate action</h2><p>The feedback form builds a draft in your browser. Previewing or copying it does not send it to us. Opening an email draft passes its contents to your configured email application. Opening a GitHub draft passes its contents to GitHub; the issue is public if you submit it. Never include confidential information in a GitHub issue.</p><p>If you send an email, we receive its contents, your email address and any attachments you choose to send. If you submit an issue, GitHub associates it with your GitHub account. We use this information to investigate feedback and respond. No app logs or diagnostics are attached automatically.</p>
+        <h2>Your choices</h2><p>You control your local workspace, exports and backups. Review reports before sharing them; they may contain customer labels, model usage or costs. Use <a href="support.html">Feedback &amp; support</a> to ask about information you have voluntarily sent us. We retain support correspondence as needed to handle the request and related follow-up; do not send sensitive data that is not needed.</p>
+        <h2>Security reports</h2><p>Do not post vulnerabilities or credentials in public feedback. Follow the <a href="https://github.com/Boreltodjom/poliora/security/policy" target="_blank" rel="noopener">security reporting policy</a>.</p>
+      </article><footer class="site-footer"><span>&copy; 2026 Poliora</span><nav aria-label="Footer"><a href="index.html">Product</a><a href="support.html">Contact &amp; feedback</a><a href="https://github.com/Boreltodjom/poliora">Source code</a></nav></footer>
+    </main>
+  </div>
 </body>
 </html>
