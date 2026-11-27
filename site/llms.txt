@@ -20,8 +20,8 @@ Poliora can detect local Codex, Claude Code, Cursor, and Antigravity launchers. 
 ## Key pages
 
 - Product: https://poliora.com/
-- Privacy: https://poliora.com/privacy.html
-- Feedback and support: https://poliora.com/support.html
+- Privacy: https://poliora.com/privacy
+- Feedback and support: https://poliora.com/support
 - Sitemap: https://poliora.com/sitemap.xml
 
 ## Accounts, feedback and analytics

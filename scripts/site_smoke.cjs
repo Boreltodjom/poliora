@@ -145,6 +145,24 @@ async function inspect(browser, name, viewport) {
     const asset = await page.request.get(`${url}/${pathName}`);
     if (!asset.ok()) throw new Error(`${name}: ${pathName} is unavailable`);
   }
+  if (url === 'https://poliora.com') {
+    const sitemapResponse = await page.request.get(`${url}/sitemap.xml`);
+    const entries = await page.evaluate((xml) => {
+      const document = new DOMParser().parseFromString(xml, 'application/xml');
+      if (document.querySelector('parsererror')) throw new Error('Sitemap XML is invalid');
+      return [...document.getElementsByTagName('loc')].map((entry) => entry.textContent.trim());
+    }, await sitemapResponse.text());
+    for (const entry of entries) {
+      const target = await page.request.get(entry, { maxRedirects: 0 });
+      if (target.status() !== 200) throw new Error(`${name}: sitemap entry is not a direct 200: ${entry}`);
+      const canonical = await page.evaluate((html) => new DOMParser().parseFromString(html, 'text/html').querySelector('link[rel="canonical"]')?.href, await target.text());
+      if (canonical !== entry) throw new Error(`${name}: sitemap/canonical mismatch: ${entry} -> ${canonical}`);
+    }
+    const missing = await page.request.get(`${url}/seo-check-page-that-does-not-exist`);
+    if (missing.status() !== 404) throw new Error(`${name}: missing page is not a real 404`);
+    const alias = await page.request.get('https://poliora.pages.dev/support?type=integration', { maxRedirects: 0 });
+    if (alias.status() !== 301 || alias.headers().location !== `${url}/support?type=integration`) throw new Error(`${name}: temporary domain is not permanently redirected`);
+  }
   await page.close();
   return { name, ...dimensions, screenshot };
 }
